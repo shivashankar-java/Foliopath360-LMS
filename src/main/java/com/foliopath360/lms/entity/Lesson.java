@@ -33,12 +33,24 @@ public class Lesson extends AuditFields {
     private String description;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "lesson_type", nullable = false, length = 30)
+    @Builder.Default
+    private LessonType lessonType = LessonType.TEXT_ONLY;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "content_type", nullable = false, length = 30)
     private ContentType contentType;
 
     @Lob
     @Column(name = "content", columnDefinition = "LONGTEXT")
     private String content;
+
+    @Lob
+    @Column(name = "code_content", columnDefinition = "LONGTEXT")
+    private String codeContent;
+
+    @Column(name = "code_language", length = 50)
+    private String codeLanguage;
 
     @Column(name = "document_url", length = 500)
     private String documentUrl;
