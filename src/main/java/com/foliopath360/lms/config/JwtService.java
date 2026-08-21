@@ -11,7 +11,9 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 public class JwtService {
@@ -34,6 +36,9 @@ public class JwtService {
         Map<String, Object> claims = new HashMap<>();
         claims.put("username", user.getUsername());
         claims.put("email", user.getEmail());
+        claims.put("roles", user.getRoles().stream()
+                .map(role -> "ROLE_" + role.getRoleName())
+                .collect(Collectors.toList()));
 
         return Jwts.builder()
                 .claims(claims)
@@ -69,6 +74,13 @@ public class JwtService {
 
         return extractAllClaims(token)
                 .get("username", String.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<String> extractRoles(String token) {
+
+        return extractAllClaims(token)
+                .get("roles", List.class);
     }
 
     public boolean isTokenExpired(String token) {

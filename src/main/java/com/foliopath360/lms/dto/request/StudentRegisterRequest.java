@@ -1,9 +1,6 @@
 package com.foliopath360.lms.dto.request;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.*;
 
 @Getter
@@ -11,10 +8,10 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class RegisterRequest {
+public class StudentRegisterRequest {
 
     @NotBlank
-    @Size(max = 100)
+    @Size(min = 3, max = 100)
     private String username;
 
     @NotBlank

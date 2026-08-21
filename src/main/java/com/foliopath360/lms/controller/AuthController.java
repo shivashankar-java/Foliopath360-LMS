@@ -1,9 +1,15 @@
 package com.foliopath360.lms.controller;
 
+import com.foliopath360.lms.dto.request.ForgotPasswordRequest;
 import com.foliopath360.lms.dto.request.LoginRequest;
 import com.foliopath360.lms.dto.request.LogoutRequest;
 import com.foliopath360.lms.dto.request.RefreshTokenRequest;
 import com.foliopath360.lms.dto.request.RegisterRequest;
+import com.foliopath360.lms.dto.request.ResendOtpRequest;
+import com.foliopath360.lms.dto.request.ResetPasswordRequest;
+import com.foliopath360.lms.dto.request.SetPasswordRequest;
+import com.foliopath360.lms.dto.request.VerifyOtpRequest;
+import com.foliopath360.lms.dto.response.CaptchaResponse;
 import com.foliopath360.lms.dto.response.LoginResponse;
 import com.foliopath360.lms.dto.response.MessageResponse;
 import com.foliopath360.lms.dto.response.RefreshTokenResponse;
@@ -11,6 +17,7 @@ import com.foliopath360.lms.dto.response.RegisterResponse;
 import com.foliopath360.lms.dto.response.UserResponse;
 import com.foliopath360.lms.entity.User;
 import com.foliopath360.lms.service.AuthService;
+import com.foliopath360.lms.service.CaptchaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -28,23 +35,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final CaptchaService captchaService;
 
-    @PostMapping("/register")
-    public ResponseEntity<RegisterResponse> register(
-            @Valid @RequestBody RegisterRequest request
-    ) {
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(authService.register(request));
-    }
+    @GetMapping("/captcha")
+    public ResponseEntity<CaptchaResponse> getCaptcha() {
 
-    @PostMapping("/admin/register")
-    public ResponseEntity<RegisterResponse> registerAdmin(
-            @Valid @RequestBody RegisterRequest request
-    ) {
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(authService.registerAdmin(request));
+        var result = captchaService.generateCaptcha();
+
+        return ResponseEntity.ok(
+                CaptchaResponse.builder()
+                        .captchaId(result.captchaId())
+                        .image("data:image/png;base64," + result.imageBase64())
+                        .build()
+        );
     }
 
     @PostMapping("/student/register")
@@ -54,6 +57,51 @@ public class AuthController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(authService.registerStudent(request));
+    }
+
+    @PostMapping("/student/verify-otp")
+    public ResponseEntity<MessageResponse> verifyStudentOtp(
+            @Valid @RequestBody VerifyOtpRequest request
+    ) {
+        return ResponseEntity.ok(
+                authService.verifyStudentOtp(request)
+        );
+    }
+
+    @PostMapping("/student/resend-otp")
+    public ResponseEntity<MessageResponse> resendStudentOtp(
+            @Valid @RequestBody ResendOtpRequest request
+    ) {
+        return ResponseEntity.ok(
+                authService.resendStudentOtp(request)
+        );
+    }
+
+    @PostMapping("/staff/set-password")
+    public ResponseEntity<MessageResponse> setStaffPassword(
+            @Valid @RequestBody SetPasswordRequest request
+    ) {
+        return ResponseEntity.ok(
+                authService.setStaffPassword(request)
+        );
+    }
+
+    @PostMapping("/student/forgot-password")
+    public ResponseEntity<MessageResponse> forgotStudentPassword(
+            @Valid @RequestBody ForgotPasswordRequest request
+    ) {
+        return ResponseEntity.ok(
+                authService.forgotStudentPassword(request)
+        );
+    }
+
+    @PostMapping("/student/reset-password")
+    public ResponseEntity<MessageResponse> resetStudentPassword(
+            @Valid @RequestBody ResetPasswordRequest request
+    ) {
+        return ResponseEntity.ok(
+                authService.resetStudentPassword(request)
+        );
     }
 
     @PostMapping("/login")

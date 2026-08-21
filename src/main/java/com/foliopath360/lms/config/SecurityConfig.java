@@ -54,60 +54,49 @@ public class SecurityConfig {
 
                         // Authentication APIs (public)
                         .requestMatchers(
-                                "/api/auth/register",
-                                "/api/auth/admin/register",
                                 "/api/auth/student/register",
+                                "/api/auth/student/verify-otp",
+                                "/api/auth/student/resend-otp",
+                                "/api/auth/student/forgot-password",
+                                "/api/auth/student/reset-password",
+                                "/api/auth/staff/set-password",
+                                "/api/auth/captcha",
                                 "/api/auth/login",
                                 "/api/auth/refresh-token",
                                 "/api/auth/logout"
                         ).permitAll()
 
-                        // Admin APIs - ADMIN role only
-                        .requestMatchers("/api/admin/**")
-                        .hasRole("ADMIN")
+                        // Super Admin APIs
+                        .requestMatchers("/api/super-admin/**")
+                        .hasRole("SUPER_ADMIN")
 
-                        // Student APIs - STUDENT role only
+                        // Staff APIs
+                        .requestMatchers("/api/staff/**")
+                        .hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        // Student APIs
                         .requestMatchers("/api/student/**")
                         .hasRole("STUDENT")
 
-                        // Course management (write) - ADMIN only
-                        .requestMatchers(
-                                org.springframework.http.HttpMethod.POST,
-                                "/api/courses/**"
-                        ).hasRole("ADMIN")
-
-                        .requestMatchers(
-                                org.springframework.http.HttpMethod.PUT,
-                                "/api/courses/**"
-                        ).hasRole("ADMIN")
-
-                        .requestMatchers(
-                                org.springframework.http.HttpMethod.DELETE,
-                                "/api/courses/**"
-                        ).hasRole("ADMIN")
-
-                        .requestMatchers(
-                                org.springframework.http.HttpMethod.POST,
-                                "/api/modules/**"
-                        ).hasRole("ADMIN")
-
-                        .requestMatchers(
-                                org.springframework.http.HttpMethod.PUT,
-                                "/api/modules/**"
-                        ).hasRole("ADMIN")
-
-                        .requestMatchers(
-                                org.springframework.http.HttpMethod.DELETE,
-                                "/api/modules/**"
-                        ).hasRole("ADMIN")
-
-                        // Public read-only endpoints
+                        // Public read-only course endpoints
                         .requestMatchers(
                                 org.springframework.http.HttpMethod.GET,
                                 "/api/courses",
                                 "/api/courses/published",
-                                "/api/courses/**",
-                                "/api/modules/**"
+                                "/api/courses/slug/**",
+                                "/api/courses/**"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.GET,
+                                "/api/courses/*/modules",
+                                "/api/courses/*/modules/**"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.GET,
+                                "/api/modules/*/lessons",
+                                "/api/modules/*/lessons/**"
                         ).permitAll()
 
                         .anyRequest().authenticated()

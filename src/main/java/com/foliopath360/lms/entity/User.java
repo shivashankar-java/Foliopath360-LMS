@@ -63,6 +63,13 @@ public class User extends AuditFields {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
+    // One-time staff account setup token (set-password flow)
+    @Column(name = "setup_token", length = 64, unique = true)
+    private String setupToken;
+
+    @Column(name = "setup_token_expires_at")
+    private LocalDateTime setupTokenExpiresAt;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",

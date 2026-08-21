@@ -8,13 +8,13 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "instructor_profile")
+@Table(name = "staff")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class InstructorProfile extends AuditFields {
+public class Staff extends AuditFields {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -24,8 +24,14 @@ public class InstructorProfile extends AuditFields {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    @Column(name = "instructor_code", nullable = false, unique = true, length = 50)
-    private String instructorCode;
+    @Column(name = "staff_code", nullable = false, unique = true, length = 50)
+    private String staffCode;
+
+    @Column(name = "designation", length = 150)
+    private String designation;
+
+    @Column(name = "department", length = 150)
+    private String department;
 
     @Column(name = "bio", columnDefinition = "TEXT")
     private String bio;
@@ -39,9 +45,6 @@ public class InstructorProfile extends AuditFields {
     @Column(name = "specialization", length = 200)
     private String specialization;
 
-    @Column(name = "designation", length = 150)
-    private String designation;
-
     @Column(name = "company_name", length = 200)
     private String companyName;
 
@@ -53,5 +56,4 @@ public class InstructorProfile extends AuditFields {
 
     @Column(name = "joined_at")
     private LocalDateTime joinedAt;
-
 }

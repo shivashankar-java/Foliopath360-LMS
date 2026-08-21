@@ -25,5 +25,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             String email
     );
 
+    Optional<User> findBySetupToken(String setupToken);
+
     long countByRolesRoleName(String roleName);
 }
