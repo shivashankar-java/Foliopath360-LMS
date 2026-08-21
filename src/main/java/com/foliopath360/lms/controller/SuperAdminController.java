@@ -70,6 +70,13 @@ public class SuperAdminController {
         return ResponseEntity.ok(superAdminService.updateStaffStatus(id, request));
     }
 
+    @PostMapping("/staff/{id}/resend-setup-link")
+    public ResponseEntity<MessageResponse> resendSetupLink(
+            @PathVariable UUID id
+    ) {
+        return ResponseEntity.ok(superAdminService.resendSetupLink(id));
+    }
+
     @DeleteMapping("/staff/{id}")
     public ResponseEntity<MessageResponse> deleteStaff(
             @PathVariable UUID id

@@ -250,6 +250,40 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     }
 
     @Override
+    public MessageResponse resendSetupLink(UUID userId) {
+
+        Staff staff = staffRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Staff", "userId", userId));
+
+        User user = staff.getUser();
+
+        if (Boolean.TRUE.equals(user.getEnabled())) {
+            throw new IllegalArgumentException(
+                    "Staff account is already active. No setup link needed."
+            );
+        }
+
+        String setupToken = generateSetupToken();
+
+        user.setSetupToken(setupToken);
+        user.setSetupTokenExpiresAt(LocalDateTime.now().plusHours(24));
+
+        userRepository.save(user);
+
+        String setupLink = setupLinkBaseUrl + "?token=" + setupToken;
+
+        emailService.sendStaffSetupEmail(
+                user.getEmail(),
+                user.getFirstName(),
+                setupLink
+        );
+
+        return MessageResponse.builder()
+                .message("A new setup link has been sent to " + user.getEmail())
+                .build();
+    }
+
+    @Override
     public MessageResponse deleteStaff(UUID userId) {
 
         Staff staff = staffRepository.findByUserId(userId)

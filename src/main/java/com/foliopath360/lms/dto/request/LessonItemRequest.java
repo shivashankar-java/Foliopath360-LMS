@@ -5,18 +5,12 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
-import java.util.List;
-
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class LessonRequest {
-
-    @NotBlank
-    @Size(max = 50)
-    private String lessonCode;
+public class LessonItemRequest {
 
     @NotBlank
     @Size(max = 200)
@@ -25,12 +19,6 @@ public class LessonRequest {
     @Size(max = 500)
     private String description;
 
-    @NotNull
-    private String lessonType;
-
-    @NotNull
-    private String contentType;
-
     private String content;
 
     private String codeContent;
@@ -38,13 +26,6 @@ public class LessonRequest {
     @Size(max = 50)
     private String codeLanguage;
 
-    @Size(max = 500)
-    private String documentUrl;
-
     @NotNull
     private Integer displayOrder;
-
-    private Integer estimatedMinutes;
-
-    private List<LessonItemRequest> items;
 }

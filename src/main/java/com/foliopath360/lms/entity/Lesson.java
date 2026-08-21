@@ -4,6 +4,8 @@ import com.foliopath360.lms.entity.base.AuditFields;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -65,4 +67,13 @@ public class Lesson extends AuditFields {
     @Column(name = "status", nullable = false, length = 30)
     @Builder.Default
     private LessonStatus status = LessonStatus.DRAFT;
+
+    @OneToMany(
+            mappedBy = "lesson",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    @OrderBy("displayOrder ASC")
+    @Builder.Default
+    private List<LessonItem> items = new ArrayList<>();
 }

@@ -1,12 +1,15 @@
 package com.foliopath360.lms.mapper;
 
 import com.foliopath360.lms.dto.request.CourseRequest;
+import com.foliopath360.lms.dto.request.LessonItemRequest;
 import com.foliopath360.lms.dto.response.CourseResponse;
+import com.foliopath360.lms.dto.response.LessonItemResponse;
 import com.foliopath360.lms.dto.response.LessonResponse;
 import com.foliopath360.lms.dto.response.ModuleResponse;
 import com.foliopath360.lms.entity.Course;
 import com.foliopath360.lms.entity.CourseModule;
 import com.foliopath360.lms.entity.Lesson;
+import com.foliopath360.lms.entity.LessonItem;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -19,7 +22,7 @@ public interface CourseMapper {
     @Mapping(target = "publishedAt", ignore = true)
     Course toEntity(CourseRequest request);
 
-    @Mapping(target = "modules", ignore = true)
+    // modules auto-mapped via toModuleResponse
     CourseResponse toResponse(Course course);
 
     @Mapping(target = "id", ignore = true)
@@ -37,6 +40,12 @@ public interface CourseMapper {
     @Mapping(target = "status", ignore = true)
     Lesson toLessonEntity(com.foliopath360.lms.dto.request.LessonRequest request);
 
-    @Mapping(target = "moduleId", source = "module.id")
+    // items auto-mapped via toItemResponse
     LessonResponse toLessonResponse(Lesson lesson);
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "lesson", ignore = true)
+    LessonItem toItemEntity(LessonItemRequest request);
+
+    LessonItemResponse toItemResponse(LessonItem item);
 }

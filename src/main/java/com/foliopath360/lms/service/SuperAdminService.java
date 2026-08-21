@@ -23,5 +23,7 @@ public interface SuperAdminService {
 
     StaffResponse updateStaffStatus(UUID userId, StaffStatusUpdateRequest request);
 
+    MessageResponse resendSetupLink(UUID userId);
+
     MessageResponse deleteStaff(UUID userId);
 }

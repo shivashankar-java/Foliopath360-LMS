@@ -78,6 +78,31 @@ public class SecurityConfig {
                         .requestMatchers("/api/student/**")
                         .hasRole("STUDENT")
 
+                        // Course / module / lesson management (writes)
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.POST,
+                                "/api/courses/**",
+                                "/api/modules/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.PUT,
+                                "/api/courses/**",
+                                "/api/modules/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.PATCH,
+                                "/api/courses/**",
+                                "/api/modules/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.DELETE,
+                                "/api/courses/**",
+                                "/api/modules/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
                         // Public read-only course endpoints
                         .requestMatchers(
                                 org.springframework.http.HttpMethod.GET,

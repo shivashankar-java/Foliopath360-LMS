@@ -1,8 +1,11 @@
 package com.foliopath360.lms.controller;
 
+import com.foliopath360.lms.dto.request.LessonRequest;
 import com.foliopath360.lms.dto.response.LessonResponse;
 import com.foliopath360.lms.service.LessonService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +18,36 @@ import java.util.UUID;
 public class LessonController {
 
     private final LessonService lessonService;
+
+    @PostMapping
+    public ResponseEntity<LessonResponse> createLesson(
+            @PathVariable UUID moduleId,
+            @Valid @RequestBody LessonRequest request
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(lessonService.createLesson(moduleId, request));
+    }
+
+    @PutMapping("/{lessonId}")
+    public ResponseEntity<LessonResponse> updateLesson(
+            @PathVariable UUID moduleId,
+            @PathVariable UUID lessonId,
+            @Valid @RequestBody LessonRequest request
+    ) {
+        return ResponseEntity.ok(
+                lessonService.updateLesson(lessonId, request)
+        );
+    }
+
+    @DeleteMapping("/{lessonId}")
+    public ResponseEntity<Void> deleteLesson(
+            @PathVariable UUID moduleId,
+            @PathVariable UUID lessonId
+    ) {
+        lessonService.deleteLesson(lessonId);
+        return ResponseEntity.noContent().build();
+    }
 
     @GetMapping("/{lessonId}")
     public ResponseEntity<LessonResponse> getLessonById(
