@@ -53,6 +53,20 @@ public class CourseController {
         return ResponseEntity.ok(courseService.publishCourse(id));
     }
 
+    @PostMapping("/{id}/unpublish")
+    public ResponseEntity<CourseResponse> unpublishCourse(
+            @PathVariable UUID id
+    ) {
+        return ResponseEntity.ok(courseService.unpublishCourse(id));
+    }
+
+    @PostMapping("/{id}/archive")
+    public ResponseEntity<CourseResponse> archiveCourse(
+            @PathVariable UUID id
+    ) {
+        return ResponseEntity.ok(courseService.archiveCourse(id));
+    }
+
     @GetMapping
     public ResponseEntity<List<CourseResponse>> getAllCourses() {
         return ResponseEntity.ok(courseService.getAllCourses());

@@ -1,9 +1,13 @@
 package com.foliopath360.lms.service;
 
+import com.foliopath360.lms.dto.request.ResetPasswordByAdminRequest;
 import com.foliopath360.lms.dto.request.StaffCreateRequest;
 import com.foliopath360.lms.dto.request.StaffStatusUpdateRequest;
+import com.foliopath360.lms.dto.request.StudentStatusUpdateRequest;
 import com.foliopath360.lms.dto.response.MessageResponse;
 import com.foliopath360.lms.dto.response.StaffResponse;
+import com.foliopath360.lms.dto.response.StudentAdminResponse;
+import com.foliopath360.lms.dto.response.StudentProfileAdminResponse;
 import com.foliopath360.lms.dto.response.SuperAdminDashboardResponse;
 
 import java.util.List;
@@ -25,5 +29,19 @@ public interface SuperAdminService {
 
     MessageResponse resendSetupLink(UUID userId);
 
+    MessageResponse resetStaffPassword(UUID userId, ResetPasswordByAdminRequest request);
+
     MessageResponse deleteStaff(UUID userId);
+
+    // ---------------- Student management ----------------
+
+    List<StudentAdminResponse> getAllStudents(String search);
+
+    StudentAdminResponse getStudentDetail(UUID userId);
+
+    StudentProfileAdminResponse getStudentProfile(UUID userId);
+
+    StudentAdminResponse updateStudentStatus(UUID userId, StudentStatusUpdateRequest request);
+
+    MessageResponse resetStudentPassword(UUID userId, ResetPasswordByAdminRequest request);
 }

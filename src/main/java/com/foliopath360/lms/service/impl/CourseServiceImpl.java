@@ -144,8 +144,51 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Course", "id", id));
 
+        if (course.getStatus() == CourseStatus.PUBLISHED) {
+            throw new IllegalArgumentException("Course is already published");
+        }
+
         course.setStatus(CourseStatus.PUBLISHED);
         course.setPublishedAt(LocalDateTime.now());
+
+        Course saved = courseRepository.save(course);
+
+        return courseMapper.toResponse(saved);
+    }
+
+    @Override
+    public CourseResponse unpublishCourse(UUID id) {
+
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Course", "id", id));
+
+        if (course.getStatus() != CourseStatus.PUBLISHED) {
+            throw new IllegalArgumentException(
+                    "Only published courses can be unpublished"
+            );
+        }
+
+        course.setStatus(CourseStatus.DRAFT);
+        course.setPublishedAt(null);
+
+        Course saved = courseRepository.save(course);
+
+        return courseMapper.toResponse(saved);
+    }
+
+    @Override
+    public CourseResponse archiveCourse(UUID id) {
+
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Course", "id", id));
+
+        if (course.getStatus() == CourseStatus.ARCHIVED) {
+            throw new IllegalArgumentException("Course is already archived");
+        }
+
+        course.setStatus(CourseStatus.ARCHIVED);
 
         Course saved = courseRepository.save(course);
 

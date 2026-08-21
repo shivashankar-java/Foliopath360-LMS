@@ -1,6 +1,7 @@
 package com.foliopath360.lms.service.impl;
 
 import com.foliopath360.lms.dto.request.ModuleRequest;
+import com.foliopath360.lms.dto.request.ReorderRequest;
 import com.foliopath360.lms.dto.response.ModuleResponse;
 import com.foliopath360.lms.entity.Course;
 import com.foliopath360.lms.entity.CourseModule;
@@ -104,5 +105,31 @@ public class CourseModuleServiceImpl implements CourseModuleService {
                         new ResourceNotFoundException("CourseModule", "id", moduleId));
 
         courseModuleRepository.delete(module);
+    }
+
+    @Override
+    public List<ModuleResponse> reorderModules(UUID courseId, ReorderRequest request) {
+
+        courseRepository.findById(courseId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Course", "id", courseId));
+
+        for (ReorderRequest.Entry entry : request.getEntries()) {
+
+            CourseModule module = courseModuleRepository.findById(entry.getId())
+                    .orElseThrow(() ->
+                            new ResourceNotFoundException(
+                                    "CourseModule", "id", entry.getId()));
+
+            if (!module.getCourse().getId().equals(courseId)) {
+                throw new IllegalArgumentException(
+                        "Module " + entry.getId() + " does not belong to this course"
+                );
+            }
+
+            module.setDisplayOrder(entry.getDisplayOrder());
+        }
+
+        return getModulesByCourseId(courseId);
     }
 }

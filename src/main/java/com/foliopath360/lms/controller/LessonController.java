@@ -1,6 +1,9 @@
 package com.foliopath360.lms.controller;
 
+import com.foliopath360.lms.dto.request.LessonItemRequest;
 import com.foliopath360.lms.dto.request.LessonRequest;
+import com.foliopath360.lms.dto.request.ReorderRequest;
+import com.foliopath360.lms.dto.response.LessonItemResponse;
 import com.foliopath360.lms.dto.response.LessonResponse;
 import com.foliopath360.lms.service.LessonService;
 import jakarta.validation.Valid;
@@ -47,6 +50,64 @@ public class LessonController {
     ) {
         lessonService.deleteLesson(lessonId);
         return ResponseEntity.noContent().build();
+    }
+
+    // ---------------- Lesson items (topics / text / code / docs) ----------------
+
+    @PostMapping("/{lessonId}/items")
+    public ResponseEntity<LessonItemResponse> addItem(
+            @PathVariable UUID moduleId,
+            @PathVariable UUID lessonId,
+            @Valid @RequestBody LessonItemRequest request
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(lessonService.addItem(lessonId, request));
+    }
+
+    @PutMapping("/{lessonId}/items/{itemId}")
+    public ResponseEntity<LessonItemResponse> updateItem(
+            @PathVariable UUID moduleId,
+            @PathVariable UUID lessonId,
+            @PathVariable UUID itemId,
+            @Valid @RequestBody LessonItemRequest request
+    ) {
+        return ResponseEntity.ok(
+                lessonService.updateItem(lessonId, itemId, request)
+        );
+    }
+
+    @DeleteMapping("/{lessonId}/items/{itemId}")
+    public ResponseEntity<Void> deleteItem(
+            @PathVariable UUID moduleId,
+            @PathVariable UUID lessonId,
+            @PathVariable UUID itemId
+    ) {
+        lessonService.deleteItem(lessonId, itemId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ---------------- Reordering ----------------
+
+    @PatchMapping("/reorder")
+    public ResponseEntity<List<LessonResponse>> reorderLessons(
+            @PathVariable UUID moduleId,
+            @Valid @RequestBody ReorderRequest request
+    ) {
+        return ResponseEntity.ok(
+                lessonService.reorderLessons(moduleId, request)
+        );
+    }
+
+    @PatchMapping("/{lessonId}/items/reorder")
+    public ResponseEntity<List<LessonItemResponse>> reorderItems(
+            @PathVariable UUID moduleId,
+            @PathVariable UUID lessonId,
+            @Valid @RequestBody ReorderRequest request
+    ) {
+        return ResponseEntity.ok(
+                lessonService.reorderItems(lessonId, request)
+        );
     }
 
     @GetMapping("/{lessonId}")

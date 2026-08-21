@@ -23,4 +23,8 @@ public interface CourseService {
     void deleteCourse(UUID id);
 
     CourseResponse publishCourse(UUID id);
+
+    CourseResponse unpublishCourse(UUID id);
+
+    CourseResponse archiveCourse(UUID id);
 }

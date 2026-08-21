@@ -1,9 +1,15 @@
 package com.foliopath360.lms.service.impl;
 
+import com.foliopath360.lms.dto.request.ResetPasswordByAdminRequest;
 import com.foliopath360.lms.dto.request.StaffCreateRequest;
 import com.foliopath360.lms.dto.request.StaffStatusUpdateRequest;
+import com.foliopath360.lms.dto.request.StudentStatusUpdateRequest;
 import com.foliopath360.lms.dto.response.MessageResponse;
+import com.foliopath360.lms.dto.response.RecentEnrollmentResponse;
+import com.foliopath360.lms.dto.response.RecentRegistrationResponse;
 import com.foliopath360.lms.dto.response.StaffResponse;
+import com.foliopath360.lms.dto.response.StudentAdminResponse;
+import com.foliopath360.lms.dto.response.StudentProfileAdminResponse;
 import com.foliopath360.lms.dto.response.SuperAdminDashboardResponse;
 import com.foliopath360.lms.entity.*;
 import com.foliopath360.lms.exception.ResourceNotFoundException;
@@ -28,6 +34,9 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final StaffRepository staffRepository;
+    private final CourseRepository courseRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final StudentProfileRepository studentProfileRepository;
     private final StaffMapper staffMapper;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
@@ -41,6 +50,9 @@ public class SuperAdminServiceImpl implements SuperAdminService {
             UserRepository userRepository,
             RoleRepository roleRepository,
             StaffRepository staffRepository,
+            CourseRepository courseRepository,
+            EnrollmentRepository enrollmentRepository,
+            StudentProfileRepository studentProfileRepository,
             StaffMapper staffMapper,
             PasswordEncoder passwordEncoder,
             EmailService emailService
@@ -48,6 +60,9 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.staffRepository = staffRepository;
+        this.courseRepository = courseRepository;
+        this.enrollmentRepository = enrollmentRepository;
+        this.studentProfileRepository = studentProfileRepository;
         this.staffMapper = staffMapper;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
@@ -62,11 +77,73 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         long totalStudents = userRepository.countByRolesRoleName("STUDENT");
         long totalSuperAdmins = userRepository.countByRolesRoleName("SUPER_ADMIN");
 
+        // Courses
+        long totalCourses = courseRepository.count();
+        long publishedCourses = courseRepository.countByStatus(CourseStatus.PUBLISHED);
+        long draftCourses = courseRepository.countByStatus(CourseStatus.DRAFT);
+
+        // Enrollments
+        long totalEnrollments = enrollmentRepository.count();
+        long activeStudents = enrollmentRepository.countActiveStudents(
+                EnumSet.of(EnrollmentStatus.ENROLLED, EnrollmentStatus.IN_PROGRESS)
+        );
+        long completedCourses = enrollmentRepository.countByStatus(
+                EnrollmentStatus.COMPLETED
+        );
+
+        // Recent registrations (latest 10 users)
+        List<RecentRegistrationResponse> recentRegistrations =
+                userRepository.findTop10ByOrderByCreatedDtDesc()
+                        .stream()
+                        .map(user -> RecentRegistrationResponse.builder()
+                                .userId(user.getId())
+                                .firstName(user.getFirstName())
+                                .lastName(user.getLastName())
+                                .email(user.getEmail())
+                                .roles(user.getRoles().stream()
+                                        .map(Role::getRoleName)
+                                        .collect(Collectors.toSet()))
+                                .status(user.getStatus().name())
+                                .registeredAt(user.getCreatedDt())
+                                .build())
+                        .collect(Collectors.toList());
+
+        // Recent enrollments (latest 10)
+        List<RecentEnrollmentResponse> recentEnrollments =
+                enrollmentRepository.findTop10ByOrderByEnrolledAtDesc()
+                        .stream()
+                        .map(enrollment -> {
+                            User student = enrollment.getUser();
+                            Course course = enrollment.getCourse();
+
+                            return RecentEnrollmentResponse.builder()
+                                    .enrollmentId(enrollment.getId())
+                                    .courseId(course.getId())
+                                    .courseCode(course.getCourseCode())
+                                    .courseTitle(course.getTitle())
+                                    .studentName(student.getFirstName() + " "
+                                            + student.getLastName())
+                                    .studentEmail(student.getEmail())
+                                    .enrollmentStatus(enrollment.getStatus().name())
+                                    .progressPercentage(enrollment.getProgressPercentage())
+                                    .enrolledAt(enrollment.getEnrolledAt())
+                                    .build();
+                        })
+                        .collect(Collectors.toList());
+
         return SuperAdminDashboardResponse.builder()
                 .totalUsers(totalUsers)
                 .totalStaff(totalStaff)
                 .totalStudents(totalStudents)
                 .totalSuperAdmins(totalSuperAdmins)
+                .totalCourses(totalCourses)
+                .publishedCourses(publishedCourses)
+                .draftCourses(draftCourses)
+                .totalEnrollments(totalEnrollments)
+                .activeStudents(activeStudents)
+                .completedCourses(completedCourses)
+                .recentRegistrations(recentRegistrations)
+                .recentEnrollments(recentEnrollments)
                 .build();
     }
 
@@ -294,6 +371,170 @@ public class SuperAdminServiceImpl implements SuperAdminService {
 
         return MessageResponse.builder()
                 .message("Staff deleted successfully")
+                .build();
+    }
+
+    @Override
+    public MessageResponse resetStaffPassword(
+            UUID userId, ResetPasswordByAdminRequest request
+    ) {
+
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("Passwords do not match");
+        }
+
+        User user = findUserWithRole(userId, "STAFF", "Staff");
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        return MessageResponse.builder()
+                .message("Staff password reset successfully")
+                .build();
+    }
+
+    // ------------------------------------------------------------------
+    // Student management
+    // ------------------------------------------------------------------
+
+    @Override
+    public List<StudentAdminResponse> getAllStudents(String search) {
+
+        List<User> students = (search == null || search.isBlank())
+                ? userRepository.findAllStudents()
+                : userRepository.searchStudents(search.trim());
+
+        return students.stream()
+                .map(this::toStudentAdminResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public StudentAdminResponse getStudentDetail(UUID userId) {
+
+        User user = findUserWithRole(userId, "STUDENT", "Student");
+
+        return toStudentAdminResponse(user);
+    }
+
+    @Override
+    public StudentProfileAdminResponse getStudentProfile(UUID userId) {
+
+        User user = findUserWithRole(userId, "STUDENT", "Student");
+
+        StudentProfile profile = studentProfileRepository
+                .findByUserId(userId)
+                .orElse(null);
+
+        StudentProfileAdminResponse.StudentProfileAdminResponseBuilder builder =
+                StudentProfileAdminResponse.builder()
+                        .userId(user.getId())
+                        .username(user.getUsername())
+                        .email(user.getEmail())
+                        .firstName(user.getFirstName())
+                        .lastName(user.getLastName())
+                        .mobileNumber(user.getMobileNumber())
+                        .enabled(user.getEnabled())
+                        .status(user.getStatus().name())
+                        .emailVerified(user.getEmailVerified())
+                        .registeredAt(user.getCreatedDt());
+
+        if (profile != null) {
+            builder.studentCode(profile.getStudentCode())
+                    .dateOfBirth(profile.getDateOfBirth())
+                    .gender(profile.getGender() != null
+                            ? profile.getGender().name() : null)
+                    .qualification(profile.getQualification())
+                    .occupation(profile.getOccupation())
+                    .bio(profile.getBio())
+                    .address(profile.getAddress())
+                    .city(profile.getCity())
+                    .state(profile.getState())
+                    .country(profile.getCountry())
+                    .joinedAt(profile.getJoinedAt());
+        }
+
+        return builder.build();
+    }
+
+    @Override
+    public StudentAdminResponse updateStudentStatus(
+            UUID userId, StudentStatusUpdateRequest request
+    ) {
+
+        User user = findUserWithRole(userId, "STUDENT", "Student");
+
+        user.setEnabled(request.getEnabled());
+        user.setStatus(Boolean.TRUE.equals(request.getEnabled())
+                ? UserStatus.ACTIVE : UserStatus.INACTIVE);
+
+        userRepository.save(user);
+
+        return toStudentAdminResponse(user);
+    }
+
+    @Override
+    public MessageResponse resetStudentPassword(
+            UUID userId, ResetPasswordByAdminRequest request
+    ) {
+
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("Passwords do not match");
+        }
+
+        User user = findUserWithRole(userId, "STUDENT", "Student");
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        return MessageResponse.builder()
+                .message("Student password reset successfully")
+                .build();
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+
+    private User findUserById(UUID userId) {
+
+        return userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("User", "id", userId));
+    }
+
+    private User findUserWithRole(UUID userId, String roleName, String label) {
+
+        User user = findUserById(userId);
+
+        boolean hasRole = user.getRoles().stream()
+                .anyMatch(role -> role.getRoleName().equals(roleName));
+
+        if (!hasRole) {
+            throw new IllegalArgumentException(
+                    label + " account not found with id: " + userId
+            );
+        }
+
+        return user;
+    }
+
+    private StudentAdminResponse toStudentAdminResponse(User user) {
+
+        return StudentAdminResponse.builder()
+                .userId(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .mobileNumber(user.getMobileNumber())
+                .enabled(user.getEnabled())
+                .status(user.getStatus().name())
+                .emailVerified(user.getEmailVerified())
+                .roles(user.getRoles().stream()
+                        .map(Role::getRoleName)
+                        .collect(Collectors.toSet()))
+                .registeredAt(user.getCreatedDt())
                 .build();
     }
 

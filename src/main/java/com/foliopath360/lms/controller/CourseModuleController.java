@@ -1,6 +1,7 @@
 package com.foliopath360.lms.controller;
 
 import com.foliopath360.lms.dto.request.ModuleRequest;
+import com.foliopath360.lms.dto.request.ReorderRequest;
 import com.foliopath360.lms.dto.response.ModuleResponse;
 import com.foliopath360.lms.service.CourseModuleService;
 import jakarta.validation.Valid;
@@ -47,6 +48,16 @@ public class CourseModuleController {
     ) {
         courseModuleService.deleteModule(moduleId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/reorder")
+    public ResponseEntity<List<ModuleResponse>> reorderModules(
+            @PathVariable UUID courseId,
+            @Valid @RequestBody ReorderRequest request
+    ) {
+        return ResponseEntity.ok(
+                courseModuleService.reorderModules(courseId, request)
+        );
     }
 
     @GetMapping("/{moduleId}")

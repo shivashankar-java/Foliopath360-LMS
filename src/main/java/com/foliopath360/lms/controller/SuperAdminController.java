@@ -1,9 +1,13 @@
 package com.foliopath360.lms.controller;
 
+import com.foliopath360.lms.dto.request.ResetPasswordByAdminRequest;
 import com.foliopath360.lms.dto.request.StaffCreateRequest;
 import com.foliopath360.lms.dto.request.StaffStatusUpdateRequest;
+import com.foliopath360.lms.dto.request.StudentStatusUpdateRequest;
 import com.foliopath360.lms.dto.response.MessageResponse;
 import com.foliopath360.lms.dto.response.StaffResponse;
+import com.foliopath360.lms.dto.response.StudentAdminResponse;
+import com.foliopath360.lms.dto.response.StudentProfileAdminResponse;
 import com.foliopath360.lms.dto.response.SuperAdminDashboardResponse;
 import com.foliopath360.lms.service.SuperAdminService;
 import jakarta.validation.Valid;
@@ -75,6 +79,59 @@ public class SuperAdminController {
             @PathVariable UUID id
     ) {
         return ResponseEntity.ok(superAdminService.resendSetupLink(id));
+    }
+
+    @PatchMapping("/staff/{id}/reset-password")
+    public ResponseEntity<MessageResponse> resetStaffPassword(
+            @PathVariable UUID id,
+            @Valid @RequestBody ResetPasswordByAdminRequest request
+    ) {
+        return ResponseEntity.ok(
+                superAdminService.resetStaffPassword(id, request)
+        );
+    }
+
+    // ---------------- Student management ----------------
+
+    @GetMapping("/students")
+    public ResponseEntity<List<StudentAdminResponse>> getAllStudents(
+            @RequestParam(required = false) String search
+    ) {
+        return ResponseEntity.ok(superAdminService.getAllStudents(search));
+    }
+
+    @GetMapping("/students/{id}")
+    public ResponseEntity<StudentAdminResponse> getStudentDetail(
+            @PathVariable UUID id
+    ) {
+        return ResponseEntity.ok(superAdminService.getStudentDetail(id));
+    }
+
+    @GetMapping("/students/{id}/profile")
+    public ResponseEntity<StudentProfileAdminResponse> getStudentProfile(
+            @PathVariable UUID id
+    ) {
+        return ResponseEntity.ok(superAdminService.getStudentProfile(id));
+    }
+
+    @PatchMapping("/students/{id}/status")
+    public ResponseEntity<StudentAdminResponse> updateStudentStatus(
+            @PathVariable UUID id,
+            @Valid @RequestBody StudentStatusUpdateRequest request
+    ) {
+        return ResponseEntity.ok(
+                superAdminService.updateStudentStatus(id, request)
+        );
+    }
+
+    @PatchMapping("/students/{id}/reset-password")
+    public ResponseEntity<MessageResponse> resetStudentPassword(
+            @PathVariable UUID id,
+            @Valid @RequestBody ResetPasswordByAdminRequest request
+    ) {
+        return ResponseEntity.ok(
+                superAdminService.resetStudentPassword(id, request)
+        );
     }
 
     @DeleteMapping("/staff/{id}")

@@ -2,6 +2,8 @@ package com.foliopath360.lms.service.impl;
 
 import com.foliopath360.lms.dto.request.LessonItemRequest;
 import com.foliopath360.lms.dto.request.LessonRequest;
+import com.foliopath360.lms.dto.request.ReorderRequest;
+import com.foliopath360.lms.dto.response.LessonItemResponse;
 import com.foliopath360.lms.dto.response.LessonResponse;
 import com.foliopath360.lms.entity.*;
 import com.foliopath360.lms.exception.ResourceNotFoundException;
@@ -151,5 +153,117 @@ public class LessonServiceImpl implements LessonService {
                         new ResourceNotFoundException("Lesson", "id", lessonId));
 
         lessonRepository.delete(lesson);
+    }
+
+    // ------------------------------------------------------------------
+    // Lesson items (topics / text / code / docs)
+    // ------------------------------------------------------------------
+
+    @Override
+    public LessonItemResponse addItem(UUID lessonId, LessonItemRequest request) {
+
+        Lesson lesson = findLesson(lessonId);
+
+        LessonItem item = courseMapper.toItemEntity(request);
+        item.setLesson(lesson);
+        lesson.getItems().add(item);
+
+        lessonRepository.save(lesson);
+
+        return courseMapper.toItemResponse(item);
+    }
+
+    @Override
+    public LessonItemResponse updateItem(
+            UUID lessonId, UUID itemId, LessonItemRequest request
+    ) {
+
+        Lesson lesson = findLesson(lessonId);
+
+        LessonItem item = findItem(lesson, itemId);
+
+        item.setTitle(request.getTitle());
+        item.setDescription(request.getDescription());
+        item.setContent(request.getContent());
+        item.setCodeContent(request.getCodeContent());
+        item.setCodeLanguage(request.getCodeLanguage());
+        item.setDisplayOrder(request.getDisplayOrder());
+
+        return courseMapper.toItemResponse(item);
+    }
+
+    @Override
+    public void deleteItem(UUID lessonId, UUID itemId) {
+
+        Lesson lesson = findLesson(lessonId);
+
+        LessonItem item = findItem(lesson, itemId);
+
+        lesson.getItems().remove(item);
+    }
+
+    // ------------------------------------------------------------------
+    // Reordering
+    // ------------------------------------------------------------------
+
+    @Override
+    public List<LessonResponse> reorderLessons(UUID moduleId, ReorderRequest request) {
+
+        courseModuleRepository.findById(moduleId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("CourseModule", "id", moduleId));
+
+        for (ReorderRequest.Entry entry : request.getEntries()) {
+
+            Lesson lesson = lessonRepository.findById(entry.getId())
+                    .orElseThrow(() ->
+                            new ResourceNotFoundException("Lesson", "id", entry.getId()));
+
+            if (!lesson.getModule().getId().equals(moduleId)) {
+                throw new IllegalArgumentException(
+                        "Lesson " + entry.getId() + " does not belong to this module"
+                );
+            }
+
+            lesson.setDisplayOrder(entry.getDisplayOrder());
+        }
+
+        return getLessonsByModuleId(moduleId);
+    }
+
+    @Override
+    public List<LessonItemResponse> reorderItems(UUID lessonId, ReorderRequest request) {
+
+        Lesson lesson = findLesson(lessonId);
+
+        for (ReorderRequest.Entry entry : request.getEntries()) {
+
+            LessonItem item = findItem(lesson, entry.getId());
+            item.setDisplayOrder(entry.getDisplayOrder());
+        }
+
+        return lesson.getItems().stream()
+                .map(courseMapper::toItemResponse)
+                .collect(Collectors.toList());
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+
+    private Lesson findLesson(UUID lessonId) {
+
+        return lessonRepository.findById(lessonId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Lesson", "id", lessonId));
+    }
+
+    private LessonItem findItem(Lesson lesson, UUID itemId) {
+
+        return lesson.getItems().stream()
+                .filter(i -> i.getId().equals(itemId))
+                .findFirst()
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("LessonItem", "id", itemId));
     }
 }

@@ -1,6 +1,7 @@
 package com.foliopath360.lms.service;
 
 import com.foliopath360.lms.dto.request.ModuleRequest;
+import com.foliopath360.lms.dto.request.ReorderRequest;
 import com.foliopath360.lms.dto.response.ModuleResponse;
 
 import java.util.List;
@@ -17,4 +18,6 @@ public interface CourseModuleService {
     List<ModuleResponse> getModulesByCourseId(UUID courseId);
 
     void deleteModule(UUID moduleId);
+
+    List<ModuleResponse> reorderModules(UUID courseId, ReorderRequest request);
 }
