@@ -11,6 +11,7 @@ import com.foliopath360.lms.mapper.CourseMapper;
 import com.foliopath360.lms.repository.CourseModuleRepository;
 import com.foliopath360.lms.repository.LessonRepository;
 import com.foliopath360.lms.service.LessonService;
+import com.foliopath360.lms.util.ContentSanitizer;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -52,6 +53,9 @@ public class LessonServiceImpl implements LessonService {
         Lesson lesson = courseMapper.toLessonEntity(request);
         lesson.setModule(module);
 
+        // Rich text (bold / lists etc.) is stored as sanitized HTML
+        lesson.setContent(ContentSanitizer.sanitize(request.getContent()));
+
         lesson.setLessonType(
                 LessonType.valueOf(request.getLessonType())
         );
@@ -63,7 +67,10 @@ public class LessonServiceImpl implements LessonService {
 
         // Set back-references so cascade can persist the items
         if (lesson.getItems() != null) {
-            lesson.getItems().forEach(item -> item.setLesson(lesson));
+            lesson.getItems().forEach(item -> {
+                item.setLesson(lesson);
+                item.setContent(ContentSanitizer.sanitize(item.getContent()));
+            });
         }
 
         Lesson saved = lessonRepository.save(lesson);
@@ -88,7 +95,7 @@ public class LessonServiceImpl implements LessonService {
         lesson.setLessonCode(request.getLessonCode());
         lesson.setTitle(request.getTitle());
         lesson.setDescription(request.getDescription());
-        lesson.setContent(request.getContent());
+        lesson.setContent(ContentSanitizer.sanitize(request.getContent()));
         lesson.setCodeContent(request.getCodeContent());
         lesson.setCodeLanguage(request.getCodeLanguage());
         lesson.setDocumentUrl(request.getDocumentUrl());
@@ -114,6 +121,7 @@ public class LessonServiceImpl implements LessonService {
             for (LessonItemRequest itemRequest : request.getItems()) {
                 LessonItem item = courseMapper.toItemEntity(itemRequest);
                 item.setLesson(lesson);
+                item.setContent(ContentSanitizer.sanitize(itemRequest.getContent()));
                 lesson.getItems().add(item);
             }
         }
@@ -166,6 +174,7 @@ public class LessonServiceImpl implements LessonService {
 
         LessonItem item = courseMapper.toItemEntity(request);
         item.setLesson(lesson);
+        item.setContent(ContentSanitizer.sanitize(request.getContent()));
         lesson.getItems().add(item);
 
         lessonRepository.save(lesson);
@@ -184,7 +193,7 @@ public class LessonServiceImpl implements LessonService {
 
         item.setTitle(request.getTitle());
         item.setDescription(request.getDescription());
-        item.setContent(request.getContent());
+        item.setContent(ContentSanitizer.sanitize(request.getContent()));
         item.setCodeContent(request.getCodeContent());
         item.setCodeLanguage(request.getCodeLanguage());
         item.setDisplayOrder(request.getDisplayOrder());
