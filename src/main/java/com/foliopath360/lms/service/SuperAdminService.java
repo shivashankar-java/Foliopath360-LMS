@@ -16,9 +16,7 @@ import java.util.UUID;
 public interface SuperAdminService {
 
     SuperAdminDashboardResponse getDashboard();
-
     StaffResponse createStaff(StaffCreateRequest request);
-
     List<StaffResponse> getAllStaff();
 
     StaffResponse getStaffById(UUID userId);
