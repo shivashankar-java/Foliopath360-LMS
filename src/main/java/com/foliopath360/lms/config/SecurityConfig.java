@@ -124,6 +124,45 @@ public class SecurityConfig {
                                 "/api/modules/*/lessons/**"
                         ).permitAll()
 
+                        // Mock tests: public read-only (answers hidden for non-staff)
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.GET,
+                                "/api/mock-tests/**",
+                                "/api/modules/*/mock-tests/**"
+                        ).permitAll()
+
+                        // Mock test attempts: students only
+                        // (must precede the staff/admin write rule below)
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.POST,
+                                "/api/mock-tests/*/attempts"
+                        ).hasRole("STUDENT")
+
+                        // Mock test authoring: SUPER_ADMIN / STAFF
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.POST,
+                                "/api/mock-tests/**",
+                                "/api/modules/*/mock-tests/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.PUT,
+                                "/api/mock-tests/**",
+                                "/api/modules/*/mock-tests/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.PATCH,
+                                "/api/mock-tests/**",
+                                "/api/modules/*/mock-tests/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.DELETE,
+                                "/api/mock-tests/**",
+                                "/api/modules/*/mock-tests/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
                         .anyRequest().authenticated()
                 )
 
