@@ -24,6 +24,20 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
+    @ExceptionHandler(InvalidPaymentSignatureException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidPaymentSignature(
+            InvalidPaymentSignatureException ex
+    ) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(RazorpayApiException.class)
+    public ResponseEntity<Map<String, Object>> handleRazorpayApi(
+            RazorpayApiException ex
+    ) {
+        return buildResponse(HttpStatus.BAD_GATEWAY, ex.getMessage());
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(
             IllegalArgumentException ex

@@ -55,17 +55,42 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             );
         }
 
+        if (course.getPrice() != null
+                && course.getPrice().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            throw new IllegalStateException(
+                    "This course requires payment. Please add it to your cart "
+                            + "and complete the checkout."
+            );
+        }
+
+        return activateEnrollment(student, course, true);
+    }
+
+    @Override
+    public EnrollmentResponse enrollAfterPayment(User student, Course course) {
+        // The course was already validated at cart and checkout time;
+        // payment success is the only gate required here. Idempotent:
+        // verify + webhook may both trigger this for the same order.
+        return activateEnrollment(student, course, false);
+    }
+
+    private EnrollmentResponse activateEnrollment(
+            User student, Course course, boolean throwIfAlreadyActive) {
+
         var existing = enrollmentRepository
-                .findByUserIdAndCourseId(student.getId(), courseId);
+                .findByUserIdAndCourseId(student.getId(), course.getId());
 
         if (existing.isPresent()) {
 
             Enrollment enrollment = existing.get();
 
             if (enrollment.getStatus() != EnrollmentStatus.DROPPED) {
-                throw new IllegalArgumentException(
-                        "You are already enrolled in this course"
-                );
+                if (throwIfAlreadyActive) {
+                    throw new IllegalArgumentException(
+                            "You are already enrolled in this course"
+                    );
+                }
+                return enrollmentMapper.toResponse(enrollment);
             }
 
             // Re-activate a dropped enrollment

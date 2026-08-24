@@ -89,6 +89,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/reports/**")
                         .hasAnyRole("SUPER_ADMIN", "STAFF")
 
+                        // Razorpay webhook: server-to-server, authenticated
+                        // via the X-Razorpay-Signature HMAC header
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.POST,
+                                "/api/payments/webhook"
+                        ).permitAll()
+
                         // Student APIs
                         .requestMatchers("/api/student/**")
                         .hasRole("STUDENT")
