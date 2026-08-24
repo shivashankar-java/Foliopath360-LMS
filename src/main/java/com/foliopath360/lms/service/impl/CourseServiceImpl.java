@@ -4,9 +4,11 @@ import com.foliopath360.lms.dto.request.CourseRequest;
 import com.foliopath360.lms.dto.response.CourseResponse;
 import com.foliopath360.lms.entity.Course;
 import com.foliopath360.lms.entity.CourseStatus;
+import com.foliopath360.lms.entity.EnrollmentStatus;
 import com.foliopath360.lms.exception.ResourceNotFoundException;
 import com.foliopath360.lms.mapper.CourseMapper;
 import com.foliopath360.lms.repository.CourseRepository;
+import com.foliopath360.lms.repository.EnrollmentRepository;
 import com.foliopath360.lms.service.CourseService;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -21,11 +23,25 @@ import java.util.stream.Collectors;
 public class CourseServiceImpl implements CourseService {
 
     private final CourseRepository courseRepository;
+    private final EnrollmentRepository enrollmentRepository;
     private final CourseMapper courseMapper;
 
-    public CourseServiceImpl(CourseRepository courseRepository, CourseMapper courseMapper) {
+    public CourseServiceImpl(
+            CourseRepository courseRepository,
+            EnrollmentRepository enrollmentRepository,
+            CourseMapper courseMapper
+    ) {
         this.courseRepository = courseRepository;
+        this.enrollmentRepository = enrollmentRepository;
         this.courseMapper = courseMapper;
+    }
+
+    private CourseResponse toEnrichedResponse(Course course) {
+
+        CourseResponse response = courseMapper.toResponse(course);
+        response.setEnrollmentCount(enrollmentRepository.countByCourseIdAndStatusNot(
+                course.getId(), EnrollmentStatus.DROPPED));
+        return response;
     }
 
     @Override
@@ -55,7 +71,7 @@ public class CourseServiceImpl implements CourseService {
 
         Course saved = courseRepository.save(course);
 
-        return courseMapper.toResponse(saved);
+        return toEnrichedResponse(saved);
     }
 
     @Override
@@ -82,7 +98,7 @@ public class CourseServiceImpl implements CourseService {
 
         Course saved = courseRepository.save(course);
 
-        return courseMapper.toResponse(saved);
+        return toEnrichedResponse(saved);
     }
 
     @Override
@@ -93,7 +109,7 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Course", "id", id));
 
-        return courseMapper.toResponse(course);
+        return toEnrichedResponse(course);
     }
 
     @Override
@@ -104,7 +120,7 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Course", "slug", slug));
 
-        return courseMapper.toResponse(course);
+        return toEnrichedResponse(course);
     }
 
     @Override
@@ -113,7 +129,7 @@ public class CourseServiceImpl implements CourseService {
 
         return courseRepository.findAll()
                 .stream()
-                .map(courseMapper::toResponse)
+                .map(this::toEnrichedResponse)
                 .collect(Collectors.toList());
     }
 
@@ -123,7 +139,7 @@ public class CourseServiceImpl implements CourseService {
 
         return courseRepository.findByStatus(CourseStatus.PUBLISHED)
                 .stream()
-                .map(courseMapper::toResponse)
+                .map(this::toEnrichedResponse)
                 .collect(Collectors.toList());
     }
 
@@ -153,7 +169,7 @@ public class CourseServiceImpl implements CourseService {
 
         Course saved = courseRepository.save(course);
 
-        return courseMapper.toResponse(saved);
+        return toEnrichedResponse(saved);
     }
 
     @Override
@@ -174,7 +190,7 @@ public class CourseServiceImpl implements CourseService {
 
         Course saved = courseRepository.save(course);
 
-        return courseMapper.toResponse(saved);
+        return toEnrichedResponse(saved);
     }
 
     @Override
@@ -192,6 +208,6 @@ public class CourseServiceImpl implements CourseService {
 
         Course saved = courseRepository.save(course);
 
-        return courseMapper.toResponse(saved);
+        return toEnrichedResponse(saved);
     }
 }

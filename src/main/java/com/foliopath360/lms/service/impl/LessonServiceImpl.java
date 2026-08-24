@@ -9,6 +9,7 @@ import com.foliopath360.lms.entity.*;
 import com.foliopath360.lms.exception.ResourceNotFoundException;
 import com.foliopath360.lms.mapper.CourseMapper;
 import com.foliopath360.lms.repository.CourseModuleRepository;
+import com.foliopath360.lms.repository.EnrollmentRepository;
 import com.foliopath360.lms.repository.LessonRepository;
 import com.foliopath360.lms.service.LessonService;
 import com.foliopath360.lms.util.ContentSanitizer;
@@ -25,15 +26,18 @@ public class LessonServiceImpl implements LessonService {
 
     private final LessonRepository lessonRepository;
     private final CourseModuleRepository courseModuleRepository;
+    private final EnrollmentRepository enrollmentRepository;
     private final CourseMapper courseMapper;
 
     public LessonServiceImpl(
             LessonRepository lessonRepository,
             CourseModuleRepository courseModuleRepository,
+            EnrollmentRepository enrollmentRepository,
             CourseMapper courseMapper
     ) {
         this.lessonRepository = lessonRepository;
         this.courseModuleRepository = courseModuleRepository;
+        this.enrollmentRepository = enrollmentRepository;
         this.courseMapper = courseMapper;
     }
 
@@ -151,6 +155,89 @@ public class LessonServiceImpl implements LessonService {
                 .stream()
                 .map(courseMapper::toLessonResponse)
                 .collect(Collectors.toList());
+    }
+
+    // ------------------------------------------------------------------
+    // Enrollment-aware reads (course content is locked until enrolled)
+    // ------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public LessonResponse getLessonByIdForRequester(UUID lessonId, User requester) {
+
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Lesson", "id", lessonId));
+
+        LessonResponse response = courseMapper.toLessonResponse(lesson);
+
+        if (!hasFullAccess(requester, lesson)) {
+            lockContent(response);
+        }
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public List<LessonResponse> getLessonsByModuleIdForRequester(
+            UUID moduleId, User requester) {
+
+        List<Lesson> lessons = lessonRepository
+                .findByModuleIdOrderByDisplayOrderAsc(moduleId);
+
+        boolean fullAccess = !lessons.isEmpty()
+                && hasFullAccess(requester, lessons.get(0));
+
+        return lessons.stream()
+                .map(courseMapper::toLessonResponse)
+                .peek(response -> {
+                    if (!fullAccess) {
+                        lockContent(response);
+                    }
+                })
+                .collect(Collectors.toList());
+    }
+
+    private boolean hasFullAccess(User user, Lesson lesson) {
+
+        if (user == null || user.getRoles() == null) {
+            return false;
+        }
+
+        boolean isStaff = user.getRoles().stream()
+                .map(Role::getRoleName)
+                .anyMatch(name ->
+                        name.equals("SUPER_ADMIN") || name.equals("STAFF"));
+        if (isStaff) {
+            return true;
+        }
+
+        boolean isStudent = user.getRoles().stream()
+                .map(Role::getRoleName)
+                .anyMatch(name -> name.equals("STUDENT"));
+        if (!isStudent) {
+            return false;
+        }
+
+        UUID courseId = lesson.getModule().getCourse().getId();
+
+        return enrollmentRepository.existsByUserIdAndCourseIdAndStatusNot(
+                user.getId(), courseId, EnrollmentStatus.DROPPED);
+    }
+
+    private void lockContent(LessonResponse response) {
+
+        response.setLocked(true);
+        response.setContent(null);
+        response.setCodeContent(null);
+        response.setDocumentUrl(null);
+
+        if (response.getItems() != null) {
+            response.getItems().forEach(item -> {
+                item.setContent(null);
+                item.setCodeContent(null);
+            });
+        }
     }
 
     @Override

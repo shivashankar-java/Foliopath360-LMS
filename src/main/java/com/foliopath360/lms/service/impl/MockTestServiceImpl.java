@@ -127,6 +127,14 @@ public class MockTestServiceImpl implements MockTestService {
 
         MockTest mockTest = findMockTest(mockTestId);
 
+        // Each student can attempt a mock test only once
+        if (mockTestAttemptRepository.existsByUserIdAndMockTestId(
+                student.getId(), mockTestId)) {
+            throw new IllegalStateException(
+                    "You have already attempted this mock test. "
+                            + "Only one attempt is allowed per student.");
+        }
+
         List<MockTestQuestion> questions = mockTest.getQuestions();
         int total = questions.size();
 
@@ -162,6 +170,20 @@ public class MockTestServiceImpl implements MockTestService {
         MockTestAttempt saved = mockTestAttemptRepository.save(attempt);
 
         return toAttemptResponse(saved, mockTest);
+    }
+
+    @Override
+    @Transactional
+    public Optional<MockTestAttemptResponse> getMyAttempt(
+            User student, UUID mockTestId) {
+
+        return mockTestAttemptRepository
+                .findFirstByUserIdAndMockTestIdOrderBySubmittedAtDesc(
+                        student.getId(), mockTestId)
+                .map(attempt -> {
+                    MockTest mockTest = findMockTest(mockTestId);
+                    return toAttemptResponse(attempt, mockTest);
+                });
     }
 
     // ------------------------------------------------------------------

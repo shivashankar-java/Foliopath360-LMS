@@ -5,11 +5,13 @@ import com.foliopath360.lms.dto.request.LessonRequest;
 import com.foliopath360.lms.dto.request.ReorderRequest;
 import com.foliopath360.lms.dto.response.LessonItemResponse;
 import com.foliopath360.lms.dto.response.LessonResponse;
+import com.foliopath360.lms.entity.User;
 import com.foliopath360.lms.service.LessonService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -113,19 +115,21 @@ public class LessonController {
     @GetMapping("/{lessonId}")
     public ResponseEntity<LessonResponse> getLessonById(
             @PathVariable UUID moduleId,
-            @PathVariable UUID lessonId
+            @PathVariable UUID lessonId,
+            @AuthenticationPrincipal User requester
     ) {
         return ResponseEntity.ok(
-                lessonService.getLessonById(lessonId)
+                lessonService.getLessonByIdForRequester(lessonId, requester)
         );
     }
 
     @GetMapping
     public ResponseEntity<List<LessonResponse>> getLessonsByModuleId(
-            @PathVariable UUID moduleId
+            @PathVariable UUID moduleId,
+            @AuthenticationPrincipal User requester
     ) {
         return ResponseEntity.ok(
-                lessonService.getLessonsByModuleId(moduleId)
+                lessonService.getLessonsByModuleIdForRequester(moduleId, requester)
         );
     }
 }

@@ -21,7 +21,12 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
 
     boolean existsByUserIdAndCourseId(UUID userId, UUID courseId);
 
+    boolean existsByUserIdAndCourseIdAndStatusNot(
+            UUID userId, UUID courseId, EnrollmentStatus status);
+
     long countByUserId(UUID userId);
+
+    long countByCourseIdAndStatusNot(UUID courseId, EnrollmentStatus status);
 
     long countByStatus(com.foliopath360.lms.entity.EnrollmentStatus status);
 

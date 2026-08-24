@@ -41,6 +41,8 @@ public interface CourseMapper {
     Lesson toLessonEntity(com.foliopath360.lms.dto.request.LessonRequest request);
 
     // items auto-mapped via toItemResponse
+    @Mapping(target = "courseId", source = "module.course.id")
+    @Mapping(target = "locked", ignore = true)
     LessonResponse toLessonResponse(Lesson lesson);
 
     @Mapping(target = "id", ignore = true)

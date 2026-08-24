@@ -26,5 +26,12 @@ public class CourseResponse {
     private BigDecimal price;
     private String status;
     private LocalDateTime publishedAt;
+
+    /**
+     * Number of active enrollments (DROPPED excluded).
+     * Used for landing-page highlights (Bestseller / Popular).
+     */
+    private Long enrollmentCount;
+
     private List<ModuleResponse> modules;
 }

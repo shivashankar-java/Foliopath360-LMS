@@ -66,12 +66,27 @@ public class SecurityConfig {
                                 "/api/auth/logout"
                         ).permitAll()
 
+                        // Contact Us: submissions are public, viewing is staff/admin only
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.POST,
+                                "/api/contact-us"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.GET,
+                                "/api/contact-us"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
                         // Super Admin APIs
                         .requestMatchers("/api/super-admin/**")
                         .hasRole("SUPER_ADMIN")
 
                         // Staff APIs
                         .requestMatchers("/api/staff/**")
+                        .hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        // Shared student reporting (SUPER_ADMIN + STAFF)
+                        .requestMatchers("/api/reports/**")
                         .hasAnyRole("SUPER_ADMIN", "STAFF")
 
                         // Student APIs

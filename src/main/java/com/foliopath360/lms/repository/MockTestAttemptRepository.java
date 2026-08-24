@@ -17,6 +17,10 @@ public interface MockTestAttemptRepository extends JpaRepository<MockTestAttempt
     Optional<MockTestAttempt> findFirstByUserIdAndMockTestIdOrderBySubmittedAtDesc(
             UUID userId, UUID mockTestId);
 
+    boolean existsByUserIdAndMockTestId(UUID userId, UUID mockTestId);
+
+    List<MockTestAttempt> findByUserIdOrderBySubmittedAtDesc(UUID userId);
+
     List<MockTestAttempt> findByMockTestIdOrderBySubmittedAtDesc(UUID mockTestId);
 
     long countByMockTestId(UUID mockTestId);

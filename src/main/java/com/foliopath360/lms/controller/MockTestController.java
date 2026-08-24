@@ -58,6 +58,7 @@ public class MockTestController {
      * Submit a student attempt. Grading happens server-side;
      * response matches the frontend contract:
      * { attemptId, score, total, percentage, passed }.
+     * Each student may attempt a mock test only once (409 on retry).
      */
     @PostMapping("/{mockTestId}/attempts")
     @PreAuthorize("hasRole('STUDENT')")
@@ -69,5 +70,19 @@ public class MockTestController {
         return ResponseEntity.ok(
                 mockTestService.submitAttempt(student, mockTestId, request)
         );
+    }
+
+    /**
+     * The current student's existing attempt for this test (404 if none yet).
+     */
+    @GetMapping("/{mockTestId}/my-attempt")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<MockTestAttemptResponse> getMyAttempt(
+            @AuthenticationPrincipal User student,
+            @PathVariable UUID mockTestId
+    ) {
+        return mockTestService.getMyAttempt(student, mockTestId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 }
