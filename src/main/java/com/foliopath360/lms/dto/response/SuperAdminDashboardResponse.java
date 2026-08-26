@@ -26,6 +26,9 @@ public class SuperAdminDashboardResponse {
     private long activeStudents;
     private long completedCourses;
 
+    // Monthly enrollments for chart
+    private List<MonthlyEnrollmentResponse> monthlyEnrollments;
+
     // Recent activity
     private List<RecentRegistrationResponse> recentRegistrations;
     private List<RecentEnrollmentResponse> recentEnrollments;

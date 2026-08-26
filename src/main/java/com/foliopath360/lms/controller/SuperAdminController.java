@@ -4,11 +4,13 @@ import com.foliopath360.lms.dto.request.ResetPasswordByAdminRequest;
 import com.foliopath360.lms.dto.request.StaffCreateRequest;
 import com.foliopath360.lms.dto.request.StaffStatusUpdateRequest;
 import com.foliopath360.lms.dto.request.StudentStatusUpdateRequest;
+import com.foliopath360.lms.dto.response.EnrollmentResponse;
 import com.foliopath360.lms.dto.response.MessageResponse;
 import com.foliopath360.lms.dto.response.StaffResponse;
 import com.foliopath360.lms.dto.response.StudentAdminResponse;
 import com.foliopath360.lms.dto.response.StudentProfileAdminResponse;
 import com.foliopath360.lms.dto.response.SuperAdminDashboardResponse;
+import com.foliopath360.lms.service.EnrollmentService;
 import com.foliopath360.lms.service.SuperAdminService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,9 +29,11 @@ import java.util.UUID;
 public class SuperAdminController {
 
     private final SuperAdminService superAdminService;
+    private final EnrollmentService enrollmentService;
 
-    public SuperAdminController(SuperAdminService superAdminService) {
+    public SuperAdminController(SuperAdminService superAdminService, EnrollmentService enrollmentService) {
         this.superAdminService = superAdminService;
+        this.enrollmentService = enrollmentService;
     }
 
     @GetMapping("/dashboard")
@@ -132,6 +136,13 @@ public class SuperAdminController {
         return ResponseEntity.ok(
                 superAdminService.resetStudentPassword(id, request)
         );
+    }
+
+    @GetMapping("/students/{id}/enrollments")
+    public ResponseEntity<List<EnrollmentResponse>> getStudentEnrollments(
+            @PathVariable UUID id
+    ) {
+        return ResponseEntity.ok(enrollmentService.getEnrollmentsByUserId(id));
     }
 
     @DeleteMapping("/staff/{id}")

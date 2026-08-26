@@ -5,6 +5,7 @@ import com.foliopath360.lms.dto.request.StaffCreateRequest;
 import com.foliopath360.lms.dto.request.StaffStatusUpdateRequest;
 import com.foliopath360.lms.dto.request.StudentStatusUpdateRequest;
 import com.foliopath360.lms.dto.response.MessageResponse;
+import com.foliopath360.lms.dto.response.MonthlyEnrollmentResponse;
 import com.foliopath360.lms.dto.response.RecentEnrollmentResponse;
 import com.foliopath360.lms.dto.response.RecentRegistrationResponse;
 import com.foliopath360.lms.dto.response.StaffResponse;
@@ -91,6 +92,24 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                 EnrollmentStatus.COMPLETED
         );
 
+        // Monthly enrollments (last 12 months)
+        java.time.LocalDateTime twelveMonthsAgo = java.time.LocalDateTime.now().minusMonths(12);
+        List<MonthlyEnrollmentResponse> monthlyEnrollments =
+                enrollmentRepository.findByEnrolledAtAfter(twelveMonthsAgo)
+                        .stream()
+                        .collect(Collectors.groupingBy(
+                                e -> e.getEnrolledAt().getMonth(),
+                                java.util.TreeMap::new,
+                                Collectors.counting()
+                        ))
+                        .entrySet().stream()
+                        .map(entry -> MonthlyEnrollmentResponse.builder()
+                                .month(entry.getKey().name().substring(0, 1)
+                                        + entry.getKey().name().substring(1).toLowerCase())
+                                .count(entry.getValue())
+                                .build())
+                        .collect(Collectors.toList());
+
         // Recent registrations (latest 10 users)
         List<RecentRegistrationResponse> recentRegistrations =
                 userRepository.findTop10ByOrderByCreatedDtDesc()
@@ -142,6 +161,7 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                 .totalEnrollments(totalEnrollments)
                 .activeStudents(activeStudents)
                 .completedCourses(completedCourses)
+                .monthlyEnrollments(monthlyEnrollments)
                 .recentRegistrations(recentRegistrations)
                 .recentEnrollments(recentEnrollments)
                 .build();

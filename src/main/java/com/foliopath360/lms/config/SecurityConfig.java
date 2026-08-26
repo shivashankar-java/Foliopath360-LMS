@@ -11,6 +11,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -186,6 +188,20 @@ public class SecurityConfig {
                         ).hasAnyRole("SUPER_ADMIN", "STAFF")
 
                         .anyRequest().authenticated()
+                )
+
+                // Expired / invalid / missing token -> 401 so the frontend
+                // can trigger its refresh-then-logout flow. (Role-based
+                // denials for authenticated users still return 403.)
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+                            response.getWriter().write(
+                                    "{\"status\":401,\"error\":\"Unauthorized\","
+                                            + "\"message\":\"Session expired or invalid. Please log in again.\"}"
+                            );
+                        })
                 )
 
                 .addFilterBefore(

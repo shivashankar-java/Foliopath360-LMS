@@ -36,4 +36,6 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     long countActiveStudents(@Param("statuses") Collection<EnrollmentStatus> statuses);
 
     List<Enrollment> findTop10ByOrderByEnrolledAtDesc();
+
+    List<Enrollment> findByEnrolledAtAfter(java.time.LocalDateTime since);
 }

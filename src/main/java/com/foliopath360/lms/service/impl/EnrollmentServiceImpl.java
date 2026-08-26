@@ -10,6 +10,7 @@ import com.foliopath360.lms.repository.CourseRepository;
 import com.foliopath360.lms.repository.EnrollmentRepository;
 import com.foliopath360.lms.repository.LessonProgressRepository;
 import com.foliopath360.lms.repository.LessonRepository;
+import com.foliopath360.lms.repository.UserRepository;
 import com.foliopath360.lms.service.EnrollmentService;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private final LessonProgressRepository lessonProgressRepository;
     private final LessonRepository lessonRepository;
     private final CourseRepository courseRepository;
+    private final UserRepository userRepository;
     private final EnrollmentMapper enrollmentMapper;
 
     public EnrollmentServiceImpl(
@@ -35,12 +37,14 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             LessonProgressRepository lessonProgressRepository,
             LessonRepository lessonRepository,
             CourseRepository courseRepository,
+            UserRepository userRepository,
             EnrollmentMapper enrollmentMapper
     ) {
         this.enrollmentRepository = enrollmentRepository;
         this.lessonProgressRepository = lessonProgressRepository;
         this.lessonRepository = lessonRepository;
         this.courseRepository = courseRepository;
+        this.userRepository = userRepository;
         this.enrollmentMapper = enrollmentMapper;
     }
 
@@ -205,6 +209,31 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         Enrollment enrollment = getActiveEnrollment(student.getId(), courseId);
 
         return buildProgressResponse(enrollment, student.getId());
+    }
+
+    @Override
+    public EnrollmentResponse adminEnrollStudent(UUID studentId, UUID courseId) {
+
+        User student = userRepository.findById(studentId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Student", "id", studentId));
+
+        Course course = findCourse(courseId);
+
+        if (course.getStatus() != CourseStatus.PUBLISHED) {
+            throw new IllegalArgumentException(
+                    "Can only enroll in published courses"
+            );
+        }
+
+        return activateEnrollment(student, course, true);
+    }
+
+    @Override
+    public List<EnrollmentResponse> getEnrollmentsByUserId(UUID userId) {
+        return enrollmentRepository.findByUserId(userId).stream()
+                .map(enrollmentMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
     // ------------------------------------------------------------------

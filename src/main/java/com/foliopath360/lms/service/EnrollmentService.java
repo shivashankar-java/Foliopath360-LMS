@@ -31,4 +31,8 @@ public interface EnrollmentService {
     CourseProgressResponse markLessonIncomplete(User student, UUID lessonId);
 
     CourseProgressResponse getCourseProgress(User student, UUID courseId);
+
+    EnrollmentResponse adminEnrollStudent(UUID studentId, UUID courseId);
+
+    List<EnrollmentResponse> getEnrollmentsByUserId(UUID userId);
 }
