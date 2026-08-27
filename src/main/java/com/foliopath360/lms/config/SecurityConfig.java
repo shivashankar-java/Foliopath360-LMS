@@ -162,6 +162,40 @@ public class SecurityConfig {
                                 "/api/mock-tests/*/attempts"
                         ).hasRole("STUDENT")
 
+                        // Interview kit CRUD: SUPER_ADMIN / STAFF
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.POST,
+                                "/api/interview-kits/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.PUT,
+                                "/api/interview-kits/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.PATCH,
+                                "/api/interview-kits/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.DELETE,
+                                "/api/interview-kits/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        // Interview kit student endpoints (must precede public GET)
+                        .requestMatchers(
+                                "/api/interview-kits/student/**"
+                        ).hasRole("STUDENT")
+
+                        // Public read-only interview kit endpoints
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.GET,
+                                "/api/interview-kits",
+                                "/api/interview-kits/published",
+                                "/api/interview-kits/**"
+                        ).permitAll()
+
                         // Mock test authoring: SUPER_ADMIN / STAFF
                         .requestMatchers(
                                 org.springframework.http.HttpMethod.POST,
