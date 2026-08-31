@@ -6,6 +6,8 @@ import com.foliopath360.lms.dto.request.StaffStatusUpdateRequest;
 import com.foliopath360.lms.dto.request.StudentStatusUpdateRequest;
 import com.foliopath360.lms.dto.response.MessageResponse;
 import com.foliopath360.lms.dto.response.MonthlyEnrollmentResponse;
+import com.foliopath360.lms.dto.response.MonthlyRevenueResponse;
+import com.foliopath360.lms.dto.response.PaymentTransactionResponse;
 import com.foliopath360.lms.dto.response.RecentEnrollmentResponse;
 import com.foliopath360.lms.dto.response.RecentRegistrationResponse;
 import com.foliopath360.lms.dto.response.StaffResponse;
@@ -38,6 +40,8 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final StudentProfileRepository studentProfileRepository;
+    private final OrderRepository orderRepository;
+    private final PaymentRepository paymentRepository;
     private final StaffMapper staffMapper;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
@@ -54,6 +58,8 @@ public class SuperAdminServiceImpl implements SuperAdminService {
             CourseRepository courseRepository,
             EnrollmentRepository enrollmentRepository,
             StudentProfileRepository studentProfileRepository,
+            OrderRepository orderRepository,
+            PaymentRepository paymentRepository,
             StaffMapper staffMapper,
             PasswordEncoder passwordEncoder,
             EmailService emailService
@@ -64,6 +70,8 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         this.courseRepository = courseRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.studentProfileRepository = studentProfileRepository;
+        this.orderRepository = orderRepository;
+        this.paymentRepository = paymentRepository;
         this.staffMapper = staffMapper;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
@@ -150,6 +158,89 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                         })
                         .collect(Collectors.toList());
 
+        // Revenue reconciliation from all orders (PAID final amount sums) minus
+        // any refunded amounts (recorded as negative refund payments).
+        java.math.BigDecimal totalRevenue = orderRepository.findAllByStatus(OrderStatus.PAID)
+                .stream()
+                .map(com.foliopath360.lms.entity.Order::getFinalAmount)
+                .filter(Objects::nonNull)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        java.math.BigDecimal refundedTotal = paymentRepository
+                .findByStatus(PaymentStatus.REFUNDED)
+                .stream()
+                .map(com.foliopath360.lms.entity.Payment::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        totalRevenue = totalRevenue.add(refundedTotal);
+
+        java.time.LocalDateTime sixMonthsAgo = java.time.LocalDateTime.now().minusMonths(6);
+
+        // Net monthly revenue = signed PAID orders minus signed refunds, merged per month.
+        java.util.TreeMap<java.time.Month, java.math.BigDecimal> byMonth =
+                new java.util.TreeMap<>();
+
+        orderRepository.findByStatusAndPaidAtAfter(OrderStatus.PAID, sixMonthsAgo)
+                .forEach(o -> {
+                    java.time.Month m = o.getPaidAt() == null
+                            ? o.getCreatedDt().getMonth() : o.getPaidAt().getMonth();
+                    byMonth.merge(m,
+                            o.getFinalAmount() == null
+                                    ? java.math.BigDecimal.ZERO : o.getFinalAmount(),
+                            java.math.BigDecimal::add);
+                });
+
+        paymentRepository.findByStatusInAndPaidAtAfter(
+                        List.of(PaymentStatus.REFUNDED), sixMonthsAgo)
+                .forEach(p -> {
+                    java.time.Month m = p.getPaidAt() == null
+                            ? p.getCreatedDt().getMonth() : p.getPaidAt().getMonth();
+                    byMonth.merge(m,
+                            p.getAmount() == null
+                                    ? java.math.BigDecimal.ZERO : p.getAmount(),
+                            java.math.BigDecimal::add);
+                });
+
+        List<MonthlyRevenueResponse> monthlyRevenue = byMonth.entrySet().stream()
+                .map(entry -> MonthlyRevenueResponse.builder()
+                        .month(entry.getKey().name().substring(0, 1)
+                                + entry.getKey().name().substring(1).toLowerCase())
+                        .revenue(entry.getValue())
+                        .build())
+                .collect(Collectors.toList());
+
+        // Recent successful and refunded payments as transactions
+        // (refunds carry a negative amount so they render in red).
+        List<PaymentTransactionResponse> transactions =
+                paymentRepository.findTop50ByStatusInOrderByPaidAtDesc(
+                                List.of(PaymentStatus.SUCCESS, PaymentStatus.REFUNDED))
+                        .stream()
+                        .map(payment -> {
+                            User student = payment.getUser();
+                            String courseTitle = payment.getOrder().getItems().isEmpty()
+                                    ? "Course"
+                                    : payment.getOrder().getItems().get(0).getCourseTitle();
+                            boolean isRefund =
+                                    payment.getStatus() == PaymentStatus.REFUNDED;
+                            return PaymentTransactionResponse.builder()
+                                    .id(payment.getId())
+                                    .txnId((isRefund ? "REF-" : "PAY-")
+                                            + payment.getOrder().getOrderNumber())
+                                    .studentName(student.getFirstName() + " "
+                                            + student.getLastName())
+                                    .courseTitle(courseTitle)
+                                    .amount(payment.getAmount())
+                                    .method(payment.getPaymentMethod() == null
+                                            ? "ONLINE" : payment.getPaymentMethod())
+                                    .date(payment.getPaidAt() != null
+                                            ? payment.getPaidAt()
+                                            : payment.getCreatedDt())
+                                    .status(payment.getStatus().name())
+                                    .build();
+                        })
+                        .collect(Collectors.toList());
+
         return SuperAdminDashboardResponse.builder()
                 .totalUsers(totalUsers)
                 .totalStaff(totalStaff)
@@ -164,6 +255,9 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                 .monthlyEnrollments(monthlyEnrollments)
                 .recentRegistrations(recentRegistrations)
                 .recentEnrollments(recentEnrollments)
+                .totalRevenue(totalRevenue)
+                .monthlyRevenue(monthlyRevenue)
+                .transactions(transactions)
                 .build();
     }
 

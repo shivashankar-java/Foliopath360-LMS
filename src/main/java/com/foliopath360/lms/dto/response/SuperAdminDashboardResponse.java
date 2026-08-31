@@ -2,6 +2,7 @@ package com.foliopath360.lms.dto.response;
 
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Getter
@@ -32,4 +33,9 @@ public class SuperAdminDashboardResponse {
     // Recent activity
     private List<RecentRegistrationResponse> recentRegistrations;
     private List<RecentEnrollmentResponse> recentEnrollments;
+
+    // Revenue / payment reconciliation
+    private BigDecimal totalRevenue;
+    private List<MonthlyRevenueResponse> monthlyRevenue;
+    private List<PaymentTransactionResponse> transactions;
 }
