@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-public class AdminKitEnrollRequest {
+public class AdminKitUnenrollRequest {
 
     @NotNull
     private UUID studentId;
@@ -15,10 +15,5 @@ public class AdminKitEnrollRequest {
     @NotNull
     private UUID kitId;
 
-    // Optional payment details (only captured for paid kits)
-    private BigDecimal discountPercentage;
-    private BigDecimal discountAmount;
-    private BigDecimal amountPaid;
-    private String paymentMethod;
-    private String remarks;
+    private BigDecimal refundAmount;
 }

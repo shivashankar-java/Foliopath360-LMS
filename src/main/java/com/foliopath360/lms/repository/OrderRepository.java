@@ -35,4 +35,12 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
             "ORDER BY o.createdDt DESC")
     List<Order> findOrdersByUserIdAndCourseId(
             @Param("userId") UUID userId, @Param("courseId") UUID courseId);
+
+    // Most recent order for a user that includes the given kit in one of its items.
+    @Query("SELECT o FROM Order o JOIN o.items i " +
+            "WHERE o.user.id = :userId AND i.kit.id = :kitId " +
+            "AND o.status <> com.foliopath360.lms.entity.OrderStatus.CANCELLED " +
+            "ORDER BY o.createdDt DESC")
+    List<Order> findOrdersByUserIdAndKitId(
+            @Param("userId") UUID userId, @Param("kitId") UUID kitId);
 }

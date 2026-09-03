@@ -1,8 +1,10 @@
 package com.foliopath360.lms.controller;
 
+import com.foliopath360.lms.dto.request.InterviewKitModuleRequest;
 import com.foliopath360.lms.dto.request.InterviewKitQuestionRequest;
 import com.foliopath360.lms.dto.request.InterviewKitRequest;
 import com.foliopath360.lms.dto.response.InterviewKitEnrollmentResponse;
+import com.foliopath360.lms.dto.response.InterviewKitModuleResponse;
 import com.foliopath360.lms.dto.response.InterviewKitQuestionResponse;
 import com.foliopath360.lms.dto.response.InterviewKitResponse;
 import com.foliopath360.lms.dto.response.MessageResponse;
@@ -114,6 +116,60 @@ public class InterviewKitController {
             @PathVariable UUID questionId) {
         interviewKitService.deleteQuestion(id, questionId);
         return ResponseEntity.noContent().build();
+    }
+
+    // ── Admin Module Management ─────────────────────────────────────
+
+    @GetMapping("/{id}/modules")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'STAFF')")
+    public ResponseEntity<List<InterviewKitModuleResponse>> getModules(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(interviewKitService.getModules(id));
+    }
+
+    @PostMapping("/{id}/modules")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'STAFF')")
+    public ResponseEntity<InterviewKitModuleResponse> addModule(
+            @PathVariable UUID id,
+            @Valid @RequestBody InterviewKitModuleRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(interviewKitService.addModule(id, request));
+    }
+
+    @PutMapping("/{id}/modules/{moduleId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'STAFF')")
+    public ResponseEntity<InterviewKitModuleResponse> updateModule(
+            @PathVariable UUID id,
+            @PathVariable UUID moduleId,
+            @Valid @RequestBody InterviewKitModuleRequest request) {
+        return ResponseEntity.ok(interviewKitService.updateModule(id, moduleId, request));
+    }
+
+    @DeleteMapping("/{id}/modules/{moduleId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'STAFF')")
+    public ResponseEntity<Void> deleteModule(
+            @PathVariable UUID id,
+            @PathVariable UUID moduleId) {
+        interviewKitService.deleteModule(id, moduleId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/modules/reorder")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'STAFF')")
+    public ResponseEntity<Void> reorderModules(
+            @PathVariable UUID id,
+            @RequestBody List<InterviewKitModuleRequest> modules) {
+        interviewKitService.reorderModules(id, modules);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{id}/questions/reorder")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'STAFF')")
+    public ResponseEntity<Void> reorderQuestions(
+            @PathVariable UUID id,
+            @RequestBody List<UUID> questionIds) {
+        interviewKitService.reorderQuestions(id, questionIds);
+        return ResponseEntity.ok().build();
     }
 
     // ── Student ─────────────────────────────────────────────────────

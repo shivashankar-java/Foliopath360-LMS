@@ -21,4 +21,6 @@ public class PaymentTransactionResponse {
     private String method;
     private LocalDateTime date;
     private String status;
+    // "Course" or "Interview Kit" to differentiate transaction types
+    private String type;
 }

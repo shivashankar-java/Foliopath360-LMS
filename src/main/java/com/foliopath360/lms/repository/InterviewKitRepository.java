@@ -18,6 +18,8 @@ public interface InterviewKitRepository extends JpaRepository<InterviewKit, UUID
 
     List<InterviewKit> findByStatus(KitStatus status);
 
+    long countByStatus(KitStatus status);
+
     boolean existsByKitCode(String kitCode);
 
     boolean existsBySlug(String slug);

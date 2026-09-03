@@ -42,6 +42,8 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     private final StudentProfileRepository studentProfileRepository;
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
+    private final InterviewKitRepository kitRepository;
+    private final InterviewKitEnrollmentRepository kitEnrollmentRepository;
     private final StaffMapper staffMapper;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
@@ -60,6 +62,8 @@ public class SuperAdminServiceImpl implements SuperAdminService {
             StudentProfileRepository studentProfileRepository,
             OrderRepository orderRepository,
             PaymentRepository paymentRepository,
+            InterviewKitRepository kitRepository,
+            InterviewKitEnrollmentRepository kitEnrollmentRepository,
             StaffMapper staffMapper,
             PasswordEncoder passwordEncoder,
             EmailService emailService
@@ -72,6 +76,8 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         this.studentProfileRepository = studentProfileRepository;
         this.orderRepository = orderRepository;
         this.paymentRepository = paymentRepository;
+        this.kitRepository = kitRepository;
+        this.kitEnrollmentRepository = kitEnrollmentRepository;
         this.staffMapper = staffMapper;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
@@ -91,6 +97,11 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         long publishedCourses = courseRepository.countByStatus(CourseStatus.PUBLISHED);
         long draftCourses = courseRepository.countByStatus(CourseStatus.DRAFT);
 
+        // Interview Kits
+        long totalKits = kitRepository.count();
+        long publishedKits = kitRepository.countByStatus(KitStatus.PUBLISHED);
+        long draftKits = kitRepository.countByStatus(KitStatus.DRAFT);
+
         // Enrollments
         long totalEnrollments = enrollmentRepository.count();
         long activeStudents = enrollmentRepository.countActiveStudents(
@@ -100,9 +111,13 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                 EnrollmentStatus.COMPLETED
         );
 
-        // Monthly enrollments (last 12 months)
+        // Kit enrollments (non-dropped)
+        long totalKitEnrollments = kitEnrollmentRepository.countByStatusNot(
+                KitEnrollmentStatus.DROPPED);
+
+        // Monthly course enrollments (last 12 months)
         java.time.LocalDateTime twelveMonthsAgo = java.time.LocalDateTime.now().minusMonths(12);
-        List<MonthlyEnrollmentResponse> monthlyEnrollments =
+        List<MonthlyEnrollmentResponse> monthlyCourseEnrollments =
                 enrollmentRepository.findByEnrolledAtAfter(twelveMonthsAgo)
                         .stream()
                         .collect(Collectors.groupingBy(
@@ -117,6 +132,48 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                                 .count(entry.getValue())
                                 .build())
                         .collect(Collectors.toList());
+
+        // Monthly kit enrollments (last 12 months)
+        List<MonthlyEnrollmentResponse> monthlyKitEnrollments =
+                kitEnrollmentRepository.findByStatusNotAndEnrolledAtAfter(
+                                KitEnrollmentStatus.DROPPED, twelveMonthsAgo)
+                        .stream()
+                        .collect(Collectors.groupingBy(
+                                e -> e.getEnrolledAt().getMonth(),
+                                java.util.TreeMap::new,
+                                Collectors.counting()
+                        ))
+                        .entrySet().stream()
+                        .map(entry -> MonthlyEnrollmentResponse.builder()
+                                .month(entry.getKey().name().substring(0, 1)
+                                        + entry.getKey().name().substring(1).toLowerCase())
+                                .count(entry.getValue())
+                                .build())
+                        .collect(Collectors.toList());
+
+        // Backwards-compatible combined monthly enrollments (courses + kits)
+        java.util.TreeMap<java.time.Month, Long> combinedMonthly =
+                new java.util.TreeMap<>();
+        monthlyCourseEnrollments.forEach(r -> {
+            java.time.Month m = java.time.Month.valueOf(r.getMonth().toUpperCase());
+            combinedMonthly.merge(m, r.getCount(), Long::sum);
+        });
+        monthlyKitEnrollments.forEach(r -> {
+            java.time.Month m = java.time.Month.valueOf(r.getMonth().toUpperCase());
+            combinedMonthly.merge(m, r.getCount(), Long::sum);
+        });
+        List<MonthlyEnrollmentResponse> monthlyEnrollments = combinedMonthly.entrySet().stream()
+                .map(entry -> MonthlyEnrollmentResponse.builder()
+                        .month(entry.getKey().name().substring(0, 1)
+                                + entry.getKey().name().substring(1).toLowerCase())
+                        .count(entry.getValue())
+                        .build())
+                .collect(Collectors.toList());
+
+        long thisMonthCourseEnrollments = monthlyCourseEnrollments.isEmpty()
+                ? 0 : monthlyCourseEnrollments.get(monthlyCourseEnrollments.size() - 1).getCount();
+        long thisMonthKitEnrollments = monthlyKitEnrollments.isEmpty()
+                ? 0 : monthlyKitEnrollments.get(monthlyKitEnrollments.size() - 1).getCount();
 
         // Recent registrations (latest 10 users)
         List<RecentRegistrationResponse> recentRegistrations =
@@ -212,15 +269,19 @@ public class SuperAdminServiceImpl implements SuperAdminService {
 
         // Recent successful and refunded payments as transactions
         // (refunds carry a negative amount so they render in red).
-        List<PaymentTransactionResponse> transactions =
+        // Partition course vs kit payments based on the order item type.
+        List<PaymentTransactionResponse> allTransactions =
                 paymentRepository.findTop50ByStatusInOrderByPaidAtDesc(
                                 List.of(PaymentStatus.SUCCESS, PaymentStatus.REFUNDED))
                         .stream()
                         .map(payment -> {
                             User student = payment.getUser();
-                            String courseTitle = payment.getOrder().getItems().isEmpty()
+                            OrderItem firstItem = payment.getOrder().getItems().isEmpty()
+                                    ? null : payment.getOrder().getItems().get(0);
+                            boolean isKit = firstItem != null && firstItem.getKit() != null;
+                            String itemTitle = firstItem == null
                                     ? "Course"
-                                    : payment.getOrder().getItems().get(0).getCourseTitle();
+                                    : (isKit ? firstItem.getKitName() : firstItem.getCourseTitle());
                             boolean isRefund =
                                     payment.getStatus() == PaymentStatus.REFUNDED;
                             return PaymentTransactionResponse.builder()
@@ -229,7 +290,9 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                                             + payment.getOrder().getOrderNumber())
                                     .studentName(student.getFirstName() + " "
                                             + student.getLastName())
-                                    .courseTitle(courseTitle)
+                                    .courseTitle(itemTitle == null || itemTitle.isBlank()
+                                            ? (isKit ? "Interview Kit" : "Course")
+                                            : itemTitle)
                                     .amount(payment.getAmount())
                                     .method(payment.getPaymentMethod() == null
                                             ? "ONLINE" : payment.getPaymentMethod())
@@ -237,9 +300,44 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                                             ? payment.getPaidAt()
                                             : payment.getCreatedDt())
                                     .status(payment.getStatus().name())
+                                    .type(isKit ? "Interview Kit" : "Course")
                                     .build();
                         })
                         .collect(Collectors.toList());
+
+        List<PaymentTransactionResponse> transactions = allTransactions.stream()
+                .filter(t -> "Course".equals(t.getType()))
+                .collect(Collectors.toList());
+        List<PaymentTransactionResponse> kitTransactions = allTransactions.stream()
+                .filter(t -> "Interview Kit".equals(t.getType()))
+                .collect(Collectors.toList());
+
+        // Kit revenue: sum of PAID kit orders net of refunds for kit orders.
+        java.math.BigDecimal kitRevenue = allTransactions.stream()
+                .filter(t -> "Interview Kit".equals(t.getType()))
+                .map(PaymentTransactionResponse::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        // Monthly kit revenue (last 6 months) derived from kit transactions.
+        java.util.TreeMap<java.time.Month, java.math.BigDecimal> kitByMonth =
+                new java.util.TreeMap<>();
+        kitTransactions.stream()
+                .filter(t -> t.getDate() != null
+                        && t.getDate().isAfter(sixMonthsAgo))
+                .forEach(t -> {
+                    java.time.Month m = t.getDate().getMonth();
+                    kitByMonth.merge(m,
+                            t.getAmount() == null ? java.math.BigDecimal.ZERO : t.getAmount(),
+                            java.math.BigDecimal::add);
+                });
+        List<MonthlyRevenueResponse> monthlyKitRevenue = kitByMonth.entrySet().stream()
+                .map(entry -> MonthlyRevenueResponse.builder()
+                        .month(entry.getKey().name().substring(0, 1)
+                                + entry.getKey().name().substring(1).toLowerCase())
+                        .revenue(entry.getValue())
+                        .build())
+                .collect(Collectors.toList());
 
         return SuperAdminDashboardResponse.builder()
                 .totalUsers(totalUsers)
@@ -249,15 +347,26 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                 .totalCourses(totalCourses)
                 .publishedCourses(publishedCourses)
                 .draftCourses(draftCourses)
+                .totalKits(totalKits)
+                .publishedKits(publishedKits)
+                .draftKits(draftKits)
                 .totalEnrollments(totalEnrollments)
                 .activeStudents(activeStudents)
                 .completedCourses(completedCourses)
+                .totalKitEnrollments(totalKitEnrollments)
+                .thisMonthKitEnrollments(thisMonthKitEnrollments)
+                .thisMonthCourseEnrollments(thisMonthCourseEnrollments)
                 .monthlyEnrollments(monthlyEnrollments)
+                .monthlyCourseEnrollments(monthlyCourseEnrollments)
+                .monthlyKitEnrollments(monthlyKitEnrollments)
                 .recentRegistrations(recentRegistrations)
                 .recentEnrollments(recentEnrollments)
                 .totalRevenue(totalRevenue)
+                .kitRevenue(kitRevenue)
                 .monthlyRevenue(monthlyRevenue)
+                .monthlyKitRevenue(monthlyKitRevenue)
                 .transactions(transactions)
+                .kitTransactions(kitTransactions)
                 .build();
     }
 

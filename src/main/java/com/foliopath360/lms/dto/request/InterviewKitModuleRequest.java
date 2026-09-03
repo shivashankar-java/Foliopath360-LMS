@@ -6,24 +6,12 @@ import jakarta.validation.constraints.Size;
 import lombok.*;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-public class InterviewKitQuestionRequest {
+public class InterviewKitModuleRequest {
 
     @NotBlank
-    private String questionType;
-
-    @Size(max = 50)
-    private String codeLanguage;
-
-    @NotBlank
-    private String question;
-
-    private String codeSnippet;
-
-    @NotBlank
-    private String answer;
+    @Size(max = 200)
+    private String name;
 
     @NotNull
     private Integer displayOrder;
-
-    private String moduleId;
 }

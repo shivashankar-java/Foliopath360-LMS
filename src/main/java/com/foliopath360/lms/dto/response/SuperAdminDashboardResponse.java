@@ -22,13 +22,25 @@ public class SuperAdminDashboardResponse {
     private long publishedCourses;
     private long draftCourses;
 
+    // Interview Kits
+    private long totalKits;
+    private long publishedKits;
+    private long draftKits;
+
     // Enrollments
     private long totalEnrollments;
     private long activeStudents;
     private long completedCourses;
 
+    // Kit enrollments
+    private long totalKitEnrollments;
+    private long thisMonthKitEnrollments;
+    private long thisMonthCourseEnrollments;
+
     // Monthly enrollments for chart
     private List<MonthlyEnrollmentResponse> monthlyEnrollments;
+    private List<MonthlyEnrollmentResponse> monthlyCourseEnrollments;
+    private List<MonthlyEnrollmentResponse> monthlyKitEnrollments;
 
     // Recent activity
     private List<RecentRegistrationResponse> recentRegistrations;
@@ -36,6 +48,9 @@ public class SuperAdminDashboardResponse {
 
     // Revenue / payment reconciliation
     private BigDecimal totalRevenue;
+    private BigDecimal kitRevenue;
     private List<MonthlyRevenueResponse> monthlyRevenue;
+    private List<MonthlyRevenueResponse> monthlyKitRevenue;
     private List<PaymentTransactionResponse> transactions;
+    private List<PaymentTransactionResponse> kitTransactions;
 }

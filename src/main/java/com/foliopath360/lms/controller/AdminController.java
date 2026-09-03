@@ -2,9 +2,11 @@ package com.foliopath360.lms.controller;
 
 import com.foliopath360.lms.dto.request.AdminEnrollRequest;
 import com.foliopath360.lms.dto.request.AdminKitEnrollRequest;
+import com.foliopath360.lms.dto.request.AdminKitUnenrollRequest;
 import com.foliopath360.lms.dto.request.AdminUnenrollRequest;
 import com.foliopath360.lms.dto.response.EnrollmentResponse;
 import com.foliopath360.lms.dto.response.InterviewKitEnrollmentResponse;
+import com.foliopath360.lms.dto.response.StudentKitPaymentInfoResponse;
 import com.foliopath360.lms.dto.response.StudentPaymentInfoResponse;
 import com.foliopath360.lms.service.EnrollmentService;
 import com.foliopath360.lms.service.InterviewKitService;
@@ -80,11 +82,48 @@ public class AdminController {
     public ResponseEntity<InterviewKitEnrollmentResponse> enrollStudentInKit(
             @Valid @RequestBody AdminKitEnrollRequest request
     ) {
+        boolean recordsPayment = request.getAmountPaid() != null
+                || request.getDiscountAmount() != null
+                || request.getPaymentMethod() != null;
+
+        InterviewKitEnrollmentResponse response;
+        if (recordsPayment) {
+            response = interviewKitService.adminEnrollStudentWithPayment(
+                    request.getStudentId(),
+                    request.getKitId(),
+                    request.getDiscountAmount(),
+                    request.getAmountPaid(),
+                    request.getPaymentMethod()
+            );
+        } else {
+            response = interviewKitService.adminEnrollStudent(
+                    request.getStudentId(),
+                    request.getKitId()
+            );
+        }
+
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(interviewKitService.adminEnrollStudent(
+                .body(response);
+    }
+
+    @PostMapping("/kit-enrollments/unenroll")
+    public ResponseEntity<InterviewKitEnrollmentResponse> unenrollStudentInKit(
+            @Valid @RequestBody AdminKitUnenrollRequest request
+    ) {
+        return ResponseEntity.ok(
+                interviewKitService.adminUnenrollStudentWithRefund(
                         request.getStudentId(),
-                        request.getKitId()
-                ));
+                        request.getKitId(),
+                        request.getRefundAmount()
+                )
+        );
+    }
+
+    @GetMapping("/students/{id}/kit-payments")
+    public ResponseEntity<List<StudentKitPaymentInfoResponse>> getStudentKitPayments(
+            @PathVariable UUID id
+    ) {
+        return ResponseEntity.ok(interviewKitService.getStudentKitPaymentInfo(id));
     }
 }

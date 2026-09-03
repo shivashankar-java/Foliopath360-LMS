@@ -12,6 +12,8 @@ public interface InterviewKitQuestionRepository extends JpaRepository<InterviewK
 
     List<InterviewKitQuestion> findByKitIdOrderByDisplayOrderAsc(UUID kitId);
 
+    List<InterviewKitQuestion> findByModuleIdOrderByDisplayOrderAsc(UUID moduleId);
+
     long countByKitId(UUID kitId);
 
     void deleteByKitId(UUID kitId);

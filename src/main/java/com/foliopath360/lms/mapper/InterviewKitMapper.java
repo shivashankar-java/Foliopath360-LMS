@@ -1,11 +1,13 @@
 package com.foliopath360.lms.mapper;
 
 import com.foliopath360.lms.dto.response.InterviewKitEnrollmentResponse;
+import com.foliopath360.lms.dto.response.InterviewKitModuleResponse;
 import com.foliopath360.lms.dto.response.InterviewKitQuestionResponse;
 import com.foliopath360.lms.dto.response.InterviewKitResponse;
 import com.foliopath360.lms.dto.response.StudentEnrolledKitResponse;
 import com.foliopath360.lms.entity.InterviewKit;
 import com.foliopath360.lms.entity.InterviewKitEnrollment;
+import com.foliopath360.lms.entity.InterviewKitModule;
 import com.foliopath360.lms.entity.InterviewKitQuestion;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -20,7 +22,13 @@ public interface InterviewKitMapper {
     InterviewKitResponse toResponse(InterviewKit kit);
 
     @Mapping(target = "kitId", source = "kit.id")
+    @Mapping(target = "moduleId", expression = "java(question.getModule() != null ? question.getModule().getId().toString() : null)")
     InterviewKitQuestionResponse toQuestionResponse(InterviewKitQuestion question);
+
+    @Mapping(target = "kitId", source = "kit.id")
+    @Mapping(target = "questionCount", expression = "java((long) module.getQuestions().size())")
+    @Mapping(target = "questions", ignore = true)
+    InterviewKitModuleResponse toModuleResponse(InterviewKitModule module);
 
     @Mapping(target = "enrollmentId", source = "id")
     @Mapping(target = "kitId", source = "kit.id")

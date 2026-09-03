@@ -3,6 +3,7 @@ package com.foliopath360.lms.entity;
 import com.foliopath360.lms.entity.base.AuditFields;
 import jakarta.persistence.*;
 import lombok.*;
+import java.util.ArrayList;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -49,6 +50,11 @@ public class InterviewKit extends AuditFields {
 
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
+
+    @OneToMany(mappedBy = "kit", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("displayOrder ASC")
+    @Builder.Default
+    private List<InterviewKitModule> modules = new ArrayList<>();
 
     @OneToMany(mappedBy = "kit", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("displayOrder ASC")

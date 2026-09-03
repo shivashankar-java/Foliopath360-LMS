@@ -19,6 +19,10 @@ public class InterviewKitQuestion extends AuditFields {
     @JoinColumn(name = "kit_id", nullable = false)
     private InterviewKit kit;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "module_id")
+    private InterviewKitModule module;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "question_type", nullable = false, length = 30)
     private KitQuestionType questionType;
