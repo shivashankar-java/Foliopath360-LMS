@@ -15,8 +15,8 @@ public class InterviewKitQuestion extends AuditFields {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "kit_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "kit_id")
     private InterviewKit kit;
 
     @ManyToOne(fetch = FetchType.LAZY)

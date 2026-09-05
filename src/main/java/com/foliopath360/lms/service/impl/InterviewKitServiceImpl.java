@@ -26,7 +26,11 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -87,7 +91,7 @@ public class InterviewKitServiceImpl implements InterviewKitService {
                 .status(KitStatus.DRAFT)
                 .build();
 
-        return mapper.toResponse(kitRepository.save(kit));
+        return toResponseWithQuestions(kitRepository.save(kit));
     }
 
     @Override
@@ -107,7 +111,7 @@ public class InterviewKitServiceImpl implements InterviewKitService {
         kit.setLevel(KitLevel.valueOf(request.getLevel().toUpperCase()));
         kit.setPrice(request.getPrice() != null ? request.getPrice() : java.math.BigDecimal.ZERO);
 
-        return mapper.toResponse(kitRepository.save(kit));
+        return toResponseWithQuestions(kitRepository.save(kit));
     }
 
     @Override
@@ -115,6 +119,8 @@ public class InterviewKitServiceImpl implements InterviewKitService {
         if (!kitRepository.existsById(kitId)) {
             throw new ResourceNotFoundException("InterviewKit", "id", kitId);
         }
+        questionRepository.clearKitIdForModuleQuestions(kitId);
+        questionRepository.deleteByKitIdAndModuleIdIsNull(kitId);
         kitRepository.deleteById(kitId);
     }
 
@@ -124,7 +130,9 @@ public class InterviewKitServiceImpl implements InterviewKitService {
                 .orElseThrow(() -> new ResourceNotFoundException("InterviewKit", "id", kitId));
         kit.setStatus(KitStatus.PUBLISHED);
         kit.setPublishedAt(LocalDateTime.now());
-        return mapper.toResponse(kitRepository.save(kit));
+        InterviewKitResponse resp = mapper.toResponse(kitRepository.save(kit));
+        resp.setQuestionCount(countKitQuestions(kit));
+        return resp;
     }
 
     @Override
@@ -132,7 +140,9 @@ public class InterviewKitServiceImpl implements InterviewKitService {
         InterviewKit kit = kitRepository.findById(kitId)
                 .orElseThrow(() -> new ResourceNotFoundException("InterviewKit", "id", kitId));
         kit.setStatus(KitStatus.DRAFT);
-        return mapper.toResponse(kitRepository.save(kit));
+        InterviewKitResponse resp = mapper.toResponse(kitRepository.save(kit));
+        resp.setQuestionCount(countKitQuestions(kit));
+        return resp;
     }
 
     @Override
@@ -142,6 +152,7 @@ public class InterviewKitServiceImpl implements InterviewKitService {
                     InterviewKitResponse resp = mapper.toResponse(kit);
                     resp.setEnrollmentCount(enrollmentRepository.countByKitIdAndStatusNot(
                             kit.getId(), KitEnrollmentStatus.DROPPED));
+                    resp.setQuestionCount(countKitQuestions(kit));
                     return resp;
                 })
                 .collect(Collectors.toList());
@@ -154,25 +165,13 @@ public class InterviewKitServiceImpl implements InterviewKitService {
         InterviewKitResponse resp = mapper.toResponse(kit);
         resp.setEnrollmentCount(enrollmentRepository.countByKitIdAndStatusNot(
                 kit.getId(), KitEnrollmentStatus.DROPPED));
+        resp.setQuestionCount(countKitQuestions(kit));
         resp.setModules(
-                moduleRepository.findByKitIdOrderByDisplayOrderAsc(kitId).stream()
-                        .map(module -> {
-                            InterviewKitModuleResponse modResp = mapper.toModuleResponse(module);
-                            modResp.setQuestions(
-                                    questionRepository.findByModuleIdOrderByDisplayOrderAsc(module.getId()).stream()
-                                            .map(mapper::toQuestionResponse)
-                                            .collect(Collectors.toList())
-                            );
-                            modResp.setQuestionCount((long) modResp.getQuestions().size());
-                            return modResp;
-                        })
+                kit.getModules().stream()
+                        .map(this::buildModuleResponse)
                         .collect(Collectors.toList())
         );
-        resp.setQuestions(
-                questionRepository.findByKitIdOrderByDisplayOrderAsc(kitId).stream()
-                        .map(mapper::toQuestionResponse)
-                        .collect(Collectors.toList())
-        );
+        resp.setQuestions(buildFlatQuestions(kit));
         return resp;
     }
 
@@ -239,9 +238,9 @@ public class InterviewKitServiceImpl implements InterviewKitService {
 
     @Override
     public List<InterviewKitQuestionResponse> getQuestions(UUID kitId) {
-        return questionRepository.findByKitIdOrderByDisplayOrderAsc(kitId).stream()
-                .map(mapper::toQuestionResponse)
-                .collect(Collectors.toList());
+        InterviewKit kit = kitRepository.findById(kitId)
+                .orElseThrow(() -> new ResourceNotFoundException("InterviewKit", "id", kitId));
+        return buildFlatQuestions(kit);
     }
 
     // -- Admin Module Management ---------------------------------------------
@@ -252,12 +251,34 @@ public class InterviewKitServiceImpl implements InterviewKitService {
                 .orElseThrow(() -> new ResourceNotFoundException("InterviewKit", "id", kitId));
 
         InterviewKitModule module = InterviewKitModule.builder()
-                .kit(kit)
                 .name(request.getName())
-                .displayOrder(request.getDisplayOrder())
                 .build();
 
-        return mapper.toModuleResponse(moduleRepository.save(module));
+        module = moduleRepository.save(module);
+        kit.getModules().add(module);
+        kitRepository.save(kit);
+
+        return buildModuleResponse(module);
+    }
+
+    @Override
+    public InterviewKitModuleResponse attachModule(UUID kitId, UUID moduleId) {
+        InterviewKit kit = kitRepository.findById(kitId)
+                .orElseThrow(() -> new ResourceNotFoundException("InterviewKit", "id", kitId));
+
+        InterviewKitModule module = moduleRepository.findById(moduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("InterviewKitModule", "id", moduleId));
+
+        boolean attached = kit.getModules().stream()
+                .anyMatch(m -> m.getId().equals(moduleId));
+        if (attached) {
+            throw new IllegalArgumentException("Module is already linked to this kit");
+        }
+
+        kit.getModules().add(module);
+        kitRepository.save(kit);
+
+        return buildModuleResponse(module);
     }
 
     @Override
@@ -269,50 +290,76 @@ public class InterviewKitServiceImpl implements InterviewKitService {
                 .orElseThrow(() -> new ResourceNotFoundException("InterviewKitModule", "id", moduleId));
 
         module.setName(request.getName());
-        module.setDisplayOrder(request.getDisplayOrder());
 
-        return mapper.toModuleResponse(moduleRepository.save(module));
+        return buildModuleResponse(moduleRepository.save(module));
     }
 
     @Override
     public void deleteModule(UUID kitId, UUID moduleId) {
-        if (!moduleRepository.existsById(moduleId)) {
+        InterviewKit kit = kitRepository.findById(kitId)
+                .orElseThrow(() -> new ResourceNotFoundException("InterviewKit", "id", kitId));
+
+        List<InterviewKitModule> remaining = new ArrayList<>(kit.getModules());
+        boolean removed = remaining.removeIf(m -> m.getId().equals(moduleId));
+        if (!removed) {
             throw new ResourceNotFoundException("InterviewKitModule", "id", moduleId);
         }
-        moduleRepository.deleteById(moduleId);
+
+        // Unlink: remove the join row only. Order indices are rewritten by Hibernate.
+        kit.getModules().clear();
+        kit.getModules().addAll(remaining);
+        kitRepository.save(kit);
+
+        // If no kit references the module anymore, clean up the orphan (and its questions).
+        if (moduleRepository.countKitsByModuleId(moduleId) == 0) {
+            moduleRepository.deleteById(moduleId);
+        }
     }
 
     @Override
     public List<InterviewKitModuleResponse> getModules(UUID kitId) {
-        return moduleRepository.findByKitIdOrderByDisplayOrderAsc(kitId).stream()
-                .map(module -> {
-                    InterviewKitModuleResponse resp = mapper.toModuleResponse(module);
-                    resp.setQuestions(
-                            questionRepository.findByModuleIdOrderByDisplayOrderAsc(module.getId()).stream()
-                                    .map(mapper::toQuestionResponse)
-                                    .collect(Collectors.toList())
-                    );
-                    resp.setQuestionCount((long) resp.getQuestions().size());
-                    return resp;
-                })
+        InterviewKit kit = kitRepository.findById(kitId)
+                .orElseThrow(() -> new ResourceNotFoundException("InterviewKit", "id", kitId));
+        return kit.getModules().stream()
+                .map(this::buildModuleResponse)
                 .collect(Collectors.toList());
     }
 
     @Override
-    public void reorderModules(UUID kitId, List<InterviewKitModuleRequest> modules) {
-        kitRepository.findById(kitId)
+    public List<InterviewKitModuleResponse> getExistingModules() {
+        return moduleRepository.findAll().stream()
+                .sorted(Comparator.comparing(InterviewKitModule::getName, String.CASE_INSENSITIVE_ORDER))
+                .map(module -> InterviewKitModuleResponse.builder()
+                        .id(module.getId())
+                        .name(module.getName())
+                        .questionCount(questionRepository.countByModuleId(module.getId()))
+                        .kitsCount(moduleRepository.countKitsByModuleId(module.getId()))
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void reorderModules(UUID kitId, List<UUID> moduleIds) {
+        InterviewKit kit = kitRepository.findById(kitId)
                 .orElseThrow(() -> new ResourceNotFoundException("InterviewKit", "id", kitId));
 
-        for (InterviewKitModuleRequest req : modules) {
-            // Find module by name within the kit - this is a simple approach
-            moduleRepository.findByKitIdOrderByDisplayOrderAsc(kitId).stream()
-                    .filter(m -> m.getName().equals(req.getName()))
+        List<InterviewKitModule> current = new ArrayList<>(kit.getModules());
+        List<InterviewKitModule> ordered = new ArrayList<>();
+        for (UUID id : moduleIds) {
+            current.stream()
+                    .filter(m -> m.getId().equals(id))
                     .findFirst()
                     .ifPresent(m -> {
-                        m.setDisplayOrder(req.getDisplayOrder());
-                        moduleRepository.save(m);
+                        if (!ordered.contains(m)) {
+                            ordered.add(m);
+                        }
                     });
         }
+        current.stream().filter(m -> !ordered.contains(m)).forEach(ordered::add);
+
+        kit.getModules().clear();
+        kit.getModules().addAll(ordered);
+        kitRepository.save(kit);
     }
 
     @Override
@@ -568,6 +615,7 @@ public class InterviewKitServiceImpl implements InterviewKitService {
                     InterviewKitResponse resp = mapper.toResponse(kit);
                     resp.setEnrollmentCount(enrollmentRepository.countByKitIdAndStatusNot(
                             kit.getId(), KitEnrollmentStatus.DROPPED));
+                    resp.setQuestionCount(countKitQuestions(kit));
                     return resp;
                 })
                 .collect(Collectors.toList());
@@ -587,6 +635,57 @@ public class InterviewKitServiceImpl implements InterviewKitService {
     }
 
     // ── Helpers ─────────────────────────────────────────────────────
+
+    private InterviewKitResponse toResponseWithQuestions(InterviewKit kit) {
+        InterviewKitResponse resp = mapper.toResponse(kit);
+        resp.setQuestionCount(countKitQuestions(kit));
+        return resp;
+    }
+
+    private InterviewKitModuleResponse buildModuleResponse(InterviewKitModule module) {
+        InterviewKitModuleResponse resp = mapper.toModuleResponse(module);
+        List<InterviewKitQuestionResponse> questions = questionRepository
+                .findByModuleIdOrderByDisplayOrderAsc(module.getId()).stream()
+                .map(mapper::toQuestionResponse)
+                .collect(Collectors.toList());
+        resp.setQuestions(questions);
+        resp.setQuestionCount((long) questions.size());
+        resp.setKitsCount(moduleRepository.countKitsByModuleId(module.getId()));
+        return resp;
+    }
+
+    private List<InterviewKitQuestionResponse> buildFlatQuestions(InterviewKit kit) {
+        List<UUID> moduleIds = kit.getModules().stream()
+                .map(InterviewKitModule::getId)
+                .collect(Collectors.toList());
+
+        List<InterviewKitQuestion> moduleQuestions = moduleIds.isEmpty()
+                ? List.of()
+                : questionRepository.findByModuleIdInOrderByDisplayOrderAsc(moduleIds);
+        List<InterviewKitQuestion> unassigned =
+                questionRepository.findByKitIdAndModuleIsNull(kit.getId());
+
+        Map<UUID, InterviewKitQuestion> merged = new LinkedHashMap<>();
+        for (InterviewKitQuestion q : moduleQuestions) {
+            merged.put(q.getId(), q);
+        }
+        for (InterviewKitQuestion q : unassigned) {
+            merged.put(q.getId(), q);
+        }
+        return merged.values().stream()
+                .map(mapper::toQuestionResponse)
+                .collect(Collectors.toList());
+    }
+
+    private long countKitQuestions(InterviewKit kit) {
+        List<UUID> moduleIds = kit.getModules().stream()
+                .map(InterviewKitModule::getId)
+                .collect(Collectors.toList());
+        long moduleCount = moduleIds.isEmpty()
+                ? 0L
+                : questionRepository.countByModuleIdIn(moduleIds);
+        return moduleCount + questionRepository.countByKitIdAndModuleIsNull(kit.getId());
+    }
 
     private String generateOrderNumber() {
         String timestampPart = Long.toString(System.currentTimeMillis(), 36)

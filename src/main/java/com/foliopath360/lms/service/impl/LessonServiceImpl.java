@@ -8,6 +8,7 @@ import com.foliopath360.lms.dto.response.LessonResponse;
 import com.foliopath360.lms.entity.*;
 import com.foliopath360.lms.exception.ResourceNotFoundException;
 import com.foliopath360.lms.mapper.CourseMapper;
+import com.foliopath360.lms.repository.CourseCourseModuleRepository;
 import com.foliopath360.lms.repository.CourseModuleRepository;
 import com.foliopath360.lms.repository.EnrollmentRepository;
 import com.foliopath360.lms.repository.LessonRepository;
@@ -27,17 +28,20 @@ public class LessonServiceImpl implements LessonService {
     private final LessonRepository lessonRepository;
     private final CourseModuleRepository courseModuleRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final CourseCourseModuleRepository courseCourseModuleRepository;
     private final CourseMapper courseMapper;
 
     public LessonServiceImpl(
             LessonRepository lessonRepository,
             CourseModuleRepository courseModuleRepository,
             EnrollmentRepository enrollmentRepository,
+            CourseCourseModuleRepository courseCourseModuleRepository,
             CourseMapper courseMapper
     ) {
         this.lessonRepository = lessonRepository;
         this.courseModuleRepository = courseModuleRepository;
         this.enrollmentRepository = enrollmentRepository;
+        this.courseCourseModuleRepository = courseCourseModuleRepository;
         this.courseMapper = courseMapper;
     }
 
@@ -221,8 +225,23 @@ public class LessonServiceImpl implements LessonService {
 
         UUID courseId = lesson.getModule().getCourse().getId();
 
-        return enrollmentRepository.existsByUserIdAndCourseIdAndStatusNot(
-                user.getId(), courseId, EnrollmentStatus.DROPPED);
+        // 1) Direct enrollment in the lesson's own course.
+        if (enrollmentRepository.existsByUserIdAndCourseIdAndStatusNot(
+                user.getId(), courseId, EnrollmentStatus.DROPPED)) {
+            return true;
+        }
+
+        // 2) Enrolled in a "parent" course that embeds this course as a module
+        //    via "Add Existing Course as Module". Children inherit full access
+        //    from the parent, so students only need to enroll in the parent.
+        return courseCourseModuleRepository
+                .findByCourseIdOrderByDisplayOrderAsc(courseId)
+                .stream()
+                .anyMatch(link -> enrollmentRepository
+                        .existsByUserIdAndCourseIdAndStatusNot(
+                                user.getId(),
+                                link.getParentCourse().getId(),
+                                EnrollmentStatus.DROPPED));
     }
 
     private void lockContent(LessonResponse response) {

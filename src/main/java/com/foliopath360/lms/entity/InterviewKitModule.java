@@ -17,16 +17,8 @@ public class InterviewKitModule extends AuditFields {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "kit_id", nullable = false)
-    private InterviewKit kit;
-
     @Column(name = "name", nullable = false, length = 200)
     private String name;
-
-    @Column(name = "display_order", nullable = false)
-    @Builder.Default
-    private Integer displayOrder = 0;
 
     @OneToMany(mappedBy = "module", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("displayOrder ASC")

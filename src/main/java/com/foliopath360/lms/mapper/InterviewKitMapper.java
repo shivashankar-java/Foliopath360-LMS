@@ -17,15 +17,18 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface InterviewKitMapper {
 
-    @Mapping(target = "questionCount", expression = "java((long) kit.getQuestions().size())")
+    @Mapping(target = "questionCount", ignore = true)
     @Mapping(target = "enrollmentCount", ignore = true)
+    @Mapping(target = "modules", ignore = true)
+    @Mapping(target = "questions", ignore = true)
     InterviewKitResponse toResponse(InterviewKit kit);
 
-    @Mapping(target = "kitId", source = "kit.id")
+    @Mapping(target = "kitId", expression = "java(question.getKit() != null ? question.getKit().getId() : null)")
     @Mapping(target = "moduleId", expression = "java(question.getModule() != null ? question.getModule().getId().toString() : null)")
     InterviewKitQuestionResponse toQuestionResponse(InterviewKitQuestion question);
 
-    @Mapping(target = "kitId", source = "kit.id")
+    @Mapping(target = "kitId", ignore = true)
+    @Mapping(target = "kitsCount", ignore = true)
     @Mapping(target = "questionCount", expression = "java((long) module.getQuestions().size())")
     @Mapping(target = "questions", ignore = true)
     InterviewKitModuleResponse toModuleResponse(InterviewKitModule module);

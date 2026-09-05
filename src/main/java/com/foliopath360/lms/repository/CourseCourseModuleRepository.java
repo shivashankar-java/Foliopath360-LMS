@@ -13,6 +13,8 @@ public interface CourseCourseModuleRepository extends JpaRepository<CourseCourse
 
     List<CourseCourseModule> findByParentCourseIdOrderByDisplayOrderAsc(UUID parentCourseId);
 
+    List<CourseCourseModule> findByCourseIdOrderByDisplayOrderAsc(UUID courseId);
+
     Optional<CourseCourseModule> findByParentCourseIdAndCourseId(UUID parentCourseId, UUID courseId);
 
     boolean existsByParentCourseIdAndCourseId(UUID parentCourseId, UUID courseId);

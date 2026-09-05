@@ -158,9 +158,23 @@ public class InterviewKitController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'STAFF')")
     public ResponseEntity<Void> reorderModules(
             @PathVariable UUID id,
-            @RequestBody List<InterviewKitModuleRequest> modules) {
-        interviewKitService.reorderModules(id, modules);
+            @RequestBody List<UUID> moduleIds) {
+        interviewKitService.reorderModules(id, moduleIds);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/existing-modules")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'STAFF')")
+    public ResponseEntity<List<InterviewKitModuleResponse>> getExistingModules() {
+        return ResponseEntity.ok(interviewKitService.getExistingModules());
+    }
+
+    @PostMapping("/{id}/modules/{moduleId}/attach")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'STAFF')")
+    public ResponseEntity<InterviewKitModuleResponse> attachModule(
+            @PathVariable UUID id,
+            @PathVariable UUID moduleId) {
+        return ResponseEntity.ok(interviewKitService.attachModule(id, moduleId));
     }
 
     @PutMapping("/{id}/questions/reorder")

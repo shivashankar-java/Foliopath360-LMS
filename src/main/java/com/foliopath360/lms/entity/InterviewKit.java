@@ -51,12 +51,16 @@ public class InterviewKit extends AuditFields {
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
 
-    @OneToMany(mappedBy = "kit", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("displayOrder ASC")
+    @ManyToMany
+    @JoinTable(
+            name = "kit_modules",
+            joinColumns = @JoinColumn(name = "kit_id"),
+            inverseJoinColumns = @JoinColumn(name = "module_id"))
+    @OrderColumn(name = "order_index")
     @Builder.Default
     private List<InterviewKitModule> modules = new ArrayList<>();
 
-    @OneToMany(mappedBy = "kit", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "kit")
     @OrderBy("displayOrder ASC")
     @Builder.Default
     private List<InterviewKitQuestion> questions = new ArrayList<>();

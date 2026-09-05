@@ -11,5 +11,6 @@ public class InterviewKitModuleResponse {
     private String name;
     private Integer displayOrder;
     private Long questionCount;
+    private Long kitsCount;
     private List<InterviewKitQuestionResponse> questions;
 }

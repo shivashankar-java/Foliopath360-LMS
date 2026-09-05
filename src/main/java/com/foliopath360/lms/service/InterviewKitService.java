@@ -35,10 +35,12 @@ public interface InterviewKitService {
 
     // Admin module management
     InterviewKitModuleResponse addModule(UUID kitId, InterviewKitModuleRequest request);
+    InterviewKitModuleResponse attachModule(UUID kitId, UUID moduleId);
     InterviewKitModuleResponse updateModule(UUID kitId, UUID moduleId, InterviewKitModuleRequest request);
     void deleteModule(UUID kitId, UUID moduleId);
     List<InterviewKitModuleResponse> getModules(UUID kitId);
-    void reorderModules(UUID kitId, List<InterviewKitModuleRequest> modules);
+    List<InterviewKitModuleResponse> getExistingModules();
+    void reorderModules(UUID kitId, List<UUID> moduleIds);
     void reorderQuestions(UUID kitId, List<UUID> questionIds);
 
     // Admin enrollment
