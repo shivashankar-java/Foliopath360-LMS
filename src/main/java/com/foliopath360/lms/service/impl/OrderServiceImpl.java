@@ -7,6 +7,8 @@ import com.foliopath360.lms.mapper.OrderMapper;
 import com.foliopath360.lms.repository.CartRepository;
 import com.foliopath360.lms.repository.CourseRepository;
 import com.foliopath360.lms.repository.EnrollmentRepository;
+import com.foliopath360.lms.repository.InterviewKitEnrollmentRepository;
+import com.foliopath360.lms.repository.InterviewKitRepository;
 import com.foliopath360.lms.repository.OrderRepository;
 import com.foliopath360.lms.service.OrderService;
 import jakarta.transaction.Transactional;
@@ -24,6 +26,8 @@ public class OrderServiceImpl implements OrderService {
     private final CartRepository cartRepository;
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final InterviewKitRepository kitRepository;
+    private final InterviewKitEnrollmentRepository kitEnrollmentRepository;
     private final OrderRepository orderRepository;
     private final OrderMapper orderMapper;
 
@@ -31,12 +35,16 @@ public class OrderServiceImpl implements OrderService {
             CartRepository cartRepository,
             CourseRepository courseRepository,
             EnrollmentRepository enrollmentRepository,
+            InterviewKitRepository kitRepository,
+            InterviewKitEnrollmentRepository kitEnrollmentRepository,
             OrderRepository orderRepository,
             OrderMapper orderMapper
     ) {
         this.cartRepository = cartRepository;
         this.courseRepository = courseRepository;
         this.enrollmentRepository = enrollmentRepository;
+        this.kitRepository = kitRepository;
+        this.kitEnrollmentRepository = kitEnrollmentRepository;
         this.orderRepository = orderRepository;
         this.orderMapper = orderMapper;
     }
@@ -52,13 +60,26 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalStateException("Your cart is empty");
         }
 
-        // Re-validate every course and recalculate prices from the live data.
+        // Re-validate every item and recalculate prices from the live data.
         // The cart snapshot is informational only; the order is authoritative.
         BigDecimal subtotal = BigDecimal.ZERO;
 
         List<OrderItem> orderItems = new ArrayList<>();
 
         for (CartItem cartItem : cart.getItems()) {
+
+            if (cartItem.getKit() != null) {
+                OrderItem kitItem = buildKitOrderItem(student, cartItem);
+                orderItems.add(kitItem);
+                subtotal = subtotal.add(kitItem.getPrice());
+                continue;
+            }
+
+            if (cartItem.getCourse() == null) {
+                throw new IllegalStateException(
+                        "Cart contains an invalid item. Please remove it and try again."
+                );
+            }
 
             Course course = courseRepository.findById(cartItem.getCourse().getId())
                     .orElseThrow(() -> new ResourceNotFoundException(
@@ -140,10 +161,44 @@ public class OrderServiceImpl implements OrderService {
     // Helpers
     // ------------------------------------------------------------------
 
-    /**
-     * Human-readable, roughly sequential-looking order number,
-     * e.g. FP360-LX2K9F-8A3C1B
-     */
+    private OrderItem buildKitOrderItem(User student, CartItem cartItem) {
+
+        InterviewKit kit = kitRepository.findById(cartItem.getKit().getId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "InterviewKit", "id", cartItem.getKit().getId()));
+
+        if (kit.getStatus() != KitStatus.PUBLISHED) {
+            throw new IllegalArgumentException(
+                    "Kit '" + kit.getName()
+                            + "' is no longer available. Please remove it from your cart.");
+        }
+
+        if (kit.getPrice() == null
+                || kit.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException(
+                    "Kit '" + kit.getName()
+                            + "' is not available for purchase. Please remove it from your cart."
+            );
+        }
+
+        boolean alreadyPurchased = kitEnrollmentRepository
+                .existsByUserIdAndKitIdAndStatusNot(
+                        student.getId(), kit.getId(), KitEnrollmentStatus.DROPPED);
+
+        if (alreadyPurchased) {
+            throw new IllegalArgumentException(
+                    "You have already purchased '"
+                            + kit.getName() + "'. Please remove it from your cart.");
+        }
+
+        return OrderItem.builder()
+                .order(null) // set below once the order exists
+                .kit(kit)
+                .kitName(kit.getName())
+                .price(kit.getPrice())
+                .build();
+    }
+
     private String generateOrderNumber() {
 
         String timestampPart = Long.toString(System.currentTimeMillis(), 36)

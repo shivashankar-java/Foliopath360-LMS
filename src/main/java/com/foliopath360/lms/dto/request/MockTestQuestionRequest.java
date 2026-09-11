@@ -35,6 +35,12 @@ public class MockTestQuestionRequest {
     @Size(max = 1)
     private String correctOption;
 
+    /**
+     * Optional explanation / solution shown to students after submitting.
+     */
+    @Size(max = 5000)
+    private String solution;
+
     @NotNull
     private Integer displayOrder;
 

@@ -45,6 +45,10 @@ public class MockTestQuestion {
     @Column(name = "correct_option", nullable = false, length = 1)
     private String correctOption;
 
+    @Lob
+    @Column(name = "solution", columnDefinition = "LONGTEXT")
+    private String solution;
+
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder;
 

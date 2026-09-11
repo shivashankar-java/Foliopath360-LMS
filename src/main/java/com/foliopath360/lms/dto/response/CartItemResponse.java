@@ -15,11 +15,20 @@ public class CartItemResponse {
 
     private UUID itemId;
 
+    // "COURSE" or "KIT"
+    private String itemType;
+
     private UUID courseId;
 
     private String courseCode;
 
     private String courseTitle;
+
+    private UUID kitId;
+
+    private String kitCode;
+
+    private String kitName;
 
     private String thumbnailUrl;
 

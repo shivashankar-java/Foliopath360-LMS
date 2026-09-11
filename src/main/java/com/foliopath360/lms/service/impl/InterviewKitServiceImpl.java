@@ -598,6 +598,20 @@ public class InterviewKitServiceImpl implements InterviewKitService {
     }
 
     @Override
+    public InterviewKitEnrollmentResponse activatePaidKitEnrollment(User student, UUID kitId) {
+        InterviewKit kit = kitRepository.findById(kitId)
+                .orElseThrow(() -> new ResourceNotFoundException("InterviewKit", "id", kitId));
+
+        if (kit.getStatus() != KitStatus.PUBLISHED) {
+            throw new IllegalArgumentException("This kit is no longer available");
+        }
+
+        // Idempotent by design: an already-active enrollment is returned as-is and
+        // a dropped one is re-activated (matches how course payments behave).
+        return activateEnrollment(student, kit, false);
+    }
+
+    @Override
     public InterviewKitEnrollmentResponse dropKitEnrollment(User student, UUID kitId) {
         InterviewKitEnrollment enrollment = enrollmentRepository
                 .findByUserIdAndKitId(student.getId(), kitId)

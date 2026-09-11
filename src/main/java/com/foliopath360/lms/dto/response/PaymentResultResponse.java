@@ -23,4 +23,6 @@ public class PaymentResultResponse {
     private String orderStatus;
 
     private List<UUID> enrolledCourseIds;
+
+    private List<UUID> enrolledKitIds;
 }

@@ -20,5 +20,9 @@ public class OrderItemResponse {
 
     private String courseTitle;
 
+    private UUID kitId;
+
+    private String kitName;
+
     private BigDecimal price;
 }

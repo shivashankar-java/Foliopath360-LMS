@@ -11,9 +11,10 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "cart_items",
-    uniqueConstraints = @UniqueConstraint(
-        columnNames = {"cart_id", "course_id"}
-    )
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"cart_id", "course_id"}),
+        @UniqueConstraint(columnNames = {"cart_id", "kit_id"})
+    }
 )
 @Getter
 @Setter
@@ -30,12 +31,17 @@ public class CartItem extends AuditFields {
     @JoinColumn(name = "cart_id", nullable = false)
     private Cart cart;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "course_id", nullable = false)
+    // Course items and kit items are mutually exclusive.
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "course_id")
     private Course course;
 
-    // Price snapshot captured when the course was added to the cart.
-    // The final amount is always recalculated from the live course price at checkout.
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "kit_id")
+    private InterviewKit kit;
+
+    // Price snapshot captured when the item (course or kit) was added to the cart.
+    // The final amount is always recalculated from the live price at checkout.
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 

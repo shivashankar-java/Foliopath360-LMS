@@ -17,6 +17,7 @@ import com.foliopath360.lms.exception.ResourceNotFoundException;
 import com.foliopath360.lms.repository.OrderRepository;
 import com.foliopath360.lms.repository.PaymentRepository;
 import com.foliopath360.lms.service.EnrollmentService;
+import com.foliopath360.lms.service.InterviewKitService;
 import com.foliopath360.lms.service.PaymentService;
 import com.foliopath360.lms.util.RazorpaySignatureUtil;
 import jakarta.transaction.Transactional;
@@ -43,6 +44,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
     private final EnrollmentService enrollmentService;
+    private final InterviewKitService interviewKitService;
     private final RazorpayGateway razorpayGateway;
     private final RazorpayProperties razorpayProperties;
 
@@ -50,12 +52,14 @@ public class PaymentServiceImpl implements PaymentService {
             PaymentRepository paymentRepository,
             OrderRepository orderRepository,
             EnrollmentService enrollmentService,
+            InterviewKitService interviewKitService,
             RazorpayGateway razorpayGateway,
             RazorpayProperties razorpayProperties
     ) {
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
         this.enrollmentService = enrollmentService;
+        this.interviewKitService = interviewKitService;
         this.razorpayGateway = razorpayGateway;
         this.razorpayProperties = razorpayProperties;
     }
@@ -307,30 +311,45 @@ public class PaymentServiceImpl implements PaymentService {
         orderRepository.save(order);
 
         List<UUID> enrolledCourseIds = new ArrayList<>();
+        List<UUID> enrolledKitIds = new ArrayList<>();
 
         for (OrderItem item : order.getItems()) {
-            enrollmentService.enrollAfterPayment(order.getUser(), item.getCourse());
-            enrolledCourseIds.add(item.getCourse().getId());
+            if (item.getCourse() != null) {
+                enrollmentService.enrollAfterPayment(order.getUser(), item.getCourse());
+                enrolledCourseIds.add(item.getCourse().getId());
+            } else if (item.getKit() != null) {
+                interviewKitService.activatePaidKitEnrollment(order.getUser(), item.getKit().getId());
+                enrolledKitIds.add(item.getKit().getId());
+            }
         }
 
-        log.info("Order {} marked PAID; {} course(s) activated for user {}",
-                order.getOrderNumber(), enrolledCourseIds.size(), order.getUser().getId());
+        log.info("Order {} marked PAID; {} course(s) and {} kit(s) activated for user {}",
+                order.getOrderNumber(), enrolledCourseIds.size(), enrolledKitIds.size(),
+                order.getUser().getId());
 
         return PaymentResultResponse.builder()
-                .message("Payment successful. You now have access to your courses.")
+                .message("Payment successful. Your purchases are now unlocked.")
                 .paymentStatus(PaymentStatus.SUCCESS.name())
                 .orderId(order.getId())
                 .orderNumber(order.getOrderNumber())
                 .orderStatus(order.getStatus().name())
                 .enrolledCourseIds(enrolledCourseIds)
+                .enrolledKitIds(enrolledKitIds)
                 .build();
     }
 
     private PaymentResultResponse buildAlreadyPaidResult(Payment payment, Order order) {
 
-        List<UUID> enrolledCourseIds = order.getItems().stream()
-                .map(item -> item.getCourse().getId())
-                .toList();
+        List<UUID> enrolledCourseIds = new ArrayList<>();
+        List<UUID> enrolledKitIds = new ArrayList<>();
+
+        for (OrderItem item : order.getItems()) {
+            if (item.getCourse() != null) {
+                enrolledCourseIds.add(item.getCourse().getId());
+            } else if (item.getKit() != null) {
+                enrolledKitIds.add(item.getKit().getId());
+            }
+        }
 
         return PaymentResultResponse.builder()
                 .message("This order was already paid.")
@@ -339,6 +358,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .orderNumber(order.getOrderNumber())
                 .orderStatus(order.getStatus().name())
                 .enrolledCourseIds(enrolledCourseIds)
+                .enrolledKitIds(enrolledKitIds)
                 .build();
     }
 

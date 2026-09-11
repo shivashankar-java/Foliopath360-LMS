@@ -1,6 +1,5 @@
 package com.foliopath360.lms.dto.request;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.util.UUID;
@@ -12,6 +11,8 @@ import java.util.UUID;
 @Builder
 public class AddToCartRequest {
 
-    @NotNull(message = "courseId is required")
+    // Exactly one of courseId / kitId must be provided
     private UUID courseId;
+
+    private UUID kitId;
 }

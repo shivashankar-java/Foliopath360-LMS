@@ -20,5 +20,9 @@ public class AddToCartResponse {
 
     private String courseName;
 
+    private UUID kitId;
+
+    private String kitName;
+
     private BigDecimal price;
 }

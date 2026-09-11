@@ -24,6 +24,13 @@ public class MockTestQuestionResponse {
      */
     private String correctOption;
 
+    /**
+     * Optional explanation / solution. Exposed like {@code correctOption}:
+     * hidden from students in the general test view (it is only shown on
+     * their own post-submission review).
+     */
+    private String solution;
+
     private Integer displayOrder;
     private List<MockTestOptionResponse> options;
 }

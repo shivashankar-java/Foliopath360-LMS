@@ -57,6 +57,7 @@ public interface InterviewKitService {
     List<StudentEnrolledKitResponse> getMyEnrolledKits(User student);
     InterviewKitEnrollmentResponse getMyKitEnrollment(User student, UUID kitId);
     InterviewKitEnrollmentResponse enrollInKit(User student, UUID kitId);
+    InterviewKitEnrollmentResponse activatePaidKitEnrollment(User student, UUID kitId);
     InterviewKitEnrollmentResponse dropKitEnrollment(User student, UUID kitId);
     List<InterviewKitResponse> getPublishedKits();
     MessageResponse enrollStudentInKit(User student, UUID kitId);

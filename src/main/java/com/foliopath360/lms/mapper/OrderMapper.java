@@ -16,6 +16,8 @@ public interface OrderMapper {
     @Mapping(target = "courseId", source = "course.id")
     @Mapping(target = "courseCode", source = "course.courseCode")
     @Mapping(target = "courseTitle", source = "courseTitle")
+    @Mapping(target = "kitId", source = "kit.id")
+    @Mapping(target = "kitName", source = "kitName")
     OrderItemResponse toItemResponse(OrderItem item);
 
     List<OrderItemResponse> toItemResponses(List<OrderItem> items);

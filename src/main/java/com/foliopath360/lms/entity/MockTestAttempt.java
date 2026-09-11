@@ -42,4 +42,12 @@ public class MockTestAttempt extends AuditFields {
 
     @Column(name = "submitted_at", nullable = false)
     private LocalDateTime submittedAt;
+
+    /**
+     * The student's submitted answers (JSON map of question id -> option label).
+     * Stored so the post-submission review can re-render the student's picks.
+     */
+    @Lob
+    @Column(name = "answers_json", columnDefinition = "LONGTEXT")
+    private String answersJson;
 }

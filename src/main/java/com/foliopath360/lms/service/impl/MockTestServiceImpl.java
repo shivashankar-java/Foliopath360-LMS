@@ -5,6 +5,8 @@ import com.foliopath360.lms.dto.request.MockTestOptionRequest;
 import com.foliopath360.lms.dto.request.MockTestQuestionRequest;
 import com.foliopath360.lms.dto.request.MockTestRequest;
 import com.foliopath360.lms.dto.response.MockTestAttemptResponse;
+import com.foliopath360.lms.dto.response.MockTestOptionResponse;
+import com.foliopath360.lms.dto.response.MockTestQuestionReviewResponse;
 import com.foliopath360.lms.dto.response.MockTestResponse;
 import com.foliopath360.lms.entity.*;
 import com.foliopath360.lms.exception.ResourceNotFoundException;
@@ -14,10 +16,14 @@ import com.foliopath360.lms.repository.MockTestAttemptRepository;
 import com.foliopath360.lms.repository.MockTestQuestionRepository;
 import com.foliopath360.lms.repository.MockTestRepository;
 import com.foliopath360.lms.service.MockTestService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -37,6 +43,7 @@ public class MockTestServiceImpl implements MockTestService {
     private final MockTestAttemptRepository mockTestAttemptRepository;
     private final CourseModuleRepository courseModuleRepository;
     private final MockTestMapper mockTestMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public MockTestResponse createMockTest(UUID moduleId, MockTestRequest request) {
@@ -95,7 +102,7 @@ public class MockTestServiceImpl implements MockTestService {
         MockTestResponse response = mockTestMapper.toResponse(mockTest);
 
         if (!canViewAnswers(requester)) {
-            hideCorrectOptions(response);
+            sanitizeForStudent(response);
         }
         return response;
     }
@@ -111,7 +118,7 @@ public class MockTestServiceImpl implements MockTestService {
                 .map(mockTestMapper::toResponse)
                 .peek(response -> {
                     if (!includeAnswers) {
-                        hideCorrectOptions(response);
+                        sanitizeForStudent(response);
                     }
                 })
                 .collect(Collectors.toList());
@@ -165,6 +172,7 @@ public class MockTestServiceImpl implements MockTestService {
                 .percentage(percentage)
                 .passed(passed)
                 .submittedAt(now)
+                .answersJson(writeAnswersJson(answers))
                 .build();
 
         MockTestAttempt saved = mockTestAttemptRepository.save(attempt);
@@ -299,13 +307,19 @@ public class MockTestServiceImpl implements MockTestService {
                 .anyMatch(name -> name.equals("SUPER_ADMIN") || name.equals("STAFF"));
     }
 
-    private void hideCorrectOptions(MockTestResponse response) {
+    /**
+     * Students must not see correct answers or solutions in the general
+     * test view (they are only exposed through their own attempt review).
+     */
+    private void sanitizeForStudent(MockTestResponse response) {
 
         if (response.getQuestions() == null) {
             return;
         }
-        response.getQuestions()
-                .forEach(question -> question.setCorrectOption(null));
+        response.getQuestions().forEach(question -> {
+            question.setCorrectOption(null);
+            question.setSolution(null);
+        });
     }
 
     private MockTest findMockTest(UUID mockTestId) {
@@ -318,15 +332,66 @@ public class MockTestServiceImpl implements MockTestService {
     private MockTestAttemptResponse toAttemptResponse(
             MockTestAttempt attempt, MockTest mockTest) {
 
+        Map<String, String> storedAnswers =
+                readAnswersJson(attempt.getAnswersJson());
+
+        List<MockTestQuestionReviewResponse> review = new ArrayList<>();
+        if (mockTest.getQuestions() != null) {
+            for (MockTestQuestion question : mockTest.getQuestions()) {
+                review.add(MockTestQuestionReviewResponse.builder()
+                        .questionId(question.getId())
+                        .questionText(question.getQuestionText())
+                        .questionType(question.getQuestionType() == null
+                                ? null : question.getQuestionType().name())
+                        .codeContent(question.getCodeContent())
+                        .codeLanguage(question.getCodeLanguage())
+                        .selectedAnswer(
+                                storedAnswers.get(question.getId().toString()))
+                        .correctAnswer(question.getCorrectOption())
+                        .solution(question.getSolution())
+                        .options(question.getOptions() == null
+                                ? Collections.emptyList()
+                                : question.getOptions().stream()
+                                        .map(mockTestMapper::toOptionResponse)
+                                        .collect(Collectors.toList()))
+                        .build());
+            }
+        }
+
         return MockTestAttemptResponse.builder()
                 .attemptId(attempt.getId())
                 .mockTestId(mockTest.getId())
+                .testTitle(mockTest.getTitle())
                 .userId(attempt.getUser().getId())
                 .score(attempt.getScore())
                 .total(attempt.getTotalQuestions())
                 .percentage(attempt.getPercentage())
                 .passed(attempt.getPassed())
+                .passPercentage(mockTest.getPassPercentage())
                 .submittedAt(attempt.getSubmittedAt())
+                .questions(review)
                 .build();
+    }
+
+    private String writeAnswersJson(Map<String, String> answers) {
+        try {
+            return objectMapper.writeValueAsString(answers);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(
+                    "Failed to serialize mock test answers", e);
+        }
+    }
+
+    private Map<String, String> readAnswersJson(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyMap();
+        }
+        try {
+            return objectMapper.readValue(
+                    json, new TypeReference<Map<String, String>>() {
+                    });
+        } catch (IOException e) {
+            return Collections.emptyMap();
+        }
     }
 }
