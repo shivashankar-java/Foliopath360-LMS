@@ -6,15 +6,18 @@ import com.foliopath360.lms.dto.request.ProgrammingQuestionRunRequest;
 import com.foliopath360.lms.dto.request.ProgrammingQuestionSubmitRequest;
 import com.foliopath360.lms.dto.request.ProgrammingTestCaseRequest;
 import com.foliopath360.lms.dto.response.CodeExecutionResponse;
+import com.foliopath360.lms.dto.response.ProgrammingQuestionAccessResponse;
 import com.foliopath360.lms.dto.response.ProgrammingQuestionResponse;
 import com.foliopath360.lms.dto.response.ProgrammingQuestionSubmissionResponse;
 import com.foliopath360.lms.dto.response.ProgrammingQuestionSubmitResponse;
 import com.foliopath360.lms.dto.response.ProgrammingSubmissionCaseResult;
 import com.foliopath360.lms.entity.*;
+import com.foliopath360.lms.exception.ProgrammingQuestionAccessDeniedException;
 import com.foliopath360.lms.exception.ResourceNotFoundException;
 import com.foliopath360.lms.execution.ExecutorFactory;
 import com.foliopath360.lms.mapper.ProgrammingQuestionMapper;
-import com.foliopath360.lms.repository.CourseRepository;
+import com.foliopath360.lms.repository.EnrollmentRepository;
+import com.foliopath360.lms.repository.InterviewKitEnrollmentRepository;
 import com.foliopath360.lms.repository.ProgrammingQuestionRepository;
 import com.foliopath360.lms.repository.ProgrammingQuestionSubmissionRepository;
 import com.foliopath360.lms.service.CodeExecutionService;
@@ -36,25 +39,23 @@ public class ProgrammingQuestionServiceImpl implements ProgrammingQuestionServic
     private static final ProgrammingQuestionDifficulty DEFAULT_DIFFICULTY =
             ProgrammingQuestionDifficulty.MEDIUM;
 
+    private static final String ACCESS_DENIED_MESSAGE =
+            "Enroll in at least one course or interview kit to unlock programming questions.";
+
     private final ProgrammingQuestionRepository programmingQuestionRepository;
     private final ProgrammingQuestionSubmissionRepository programmingQuestionSubmissionRepository;
-    private final CourseRepository courseRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final InterviewKitEnrollmentRepository interviewKitEnrollmentRepository;
     private final ProgrammingQuestionMapper programmingQuestionMapper;
     private final CodeExecutionService codeExecutionService;
     private final ExecutorFactory executorFactory;
 
     @Override
-    public ProgrammingQuestionResponse createProgrammingQuestion(
-            UUID courseId, ProgrammingQuestionRequest request) {
-
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Course", "id", courseId));
+    public ProgrammingQuestionResponse createProgrammingQuestion(ProgrammingQuestionRequest request) {
 
         String questionCode = resolveUniqueQuestionCode(request.getQuestionCode());
 
         ProgrammingQuestion question = programmingQuestionMapper.toEntity(request);
-        question.setCourse(course);
         question.setQuestionCode(questionCode);
         question.setDifficulty(resolveDifficulty(request.getDifficulty()));
         question.setAllowedLanguages(String.join(",", resolveLanguages(request.getAllowedLanguages())));
@@ -108,11 +109,13 @@ public class ProgrammingQuestionServiceImpl implements ProgrammingQuestionServic
     public ProgrammingQuestionResponse getProgrammingQuestion(UUID questionId, User requester) {
 
         ProgrammingQuestion question = findProgrammingQuestion(questionId);
+        boolean isStaff = canViewFullContent(requester);
+        ensureAccess(requester, isStaff);
 
         ProgrammingQuestionResponse response = toResponse(question);
         response.setAllowedLanguages(splitLanguages(question.getAllowedLanguages()));
 
-        if (!canViewFullContent(requester)) {
+        if (!isStaff) {
             sanitizeForStudent(response);
         }
         return response;
@@ -120,24 +123,21 @@ public class ProgrammingQuestionServiceImpl implements ProgrammingQuestionServic
 
     @Override
     @Transactional
-    public List<ProgrammingQuestionResponse> getProgrammingQuestionsByCourse(
-            UUID courseId, User requester) {
+    public List<ProgrammingQuestionResponse> getProgrammingQuestions(User requester) {
 
-        boolean includeHidden = canViewFullContent(requester);
+        boolean isStaff = canViewFullContent(requester);
+        ensureAccess(requester, isStaff);
 
-        // Load the requesting student's latest submission per question in one
-        // query so the solved/attempted status comes from stored submission
-        // data, never from client-side state.
         Map<UUID, ProgrammingQuestionSubmission> latestSubmissionByQuestion =
-                resolveLatestSubmissions(courseId, requester);
+                resolveLatestSubmissions(requester);
 
         return programmingQuestionRepository
-                .findByCourseIdOrderByDisplayOrderAsc(courseId)
+                .findAllByOrderByDisplayOrderAsc()
                 .stream()
                 .map(question -> {
                     ProgrammingQuestionResponse response = toResponse(question);
                     response.setAllowedLanguages(splitLanguages(question.getAllowedLanguages()));
-                    if (!includeHidden) {
+                    if (!isStaff) {
                         sanitizeForStudent(response);
                         ProgrammingQuestionSubmission latest =
                                 latestSubmissionByQuestion.get(question.getId());
@@ -151,9 +151,46 @@ public class ProgrammingQuestionServiceImpl implements ProgrammingQuestionServic
     }
 
     @Override
-    public CodeExecutionResponse run(UUID questionId, ProgrammingQuestionRunRequest request) {
+    public ProgrammingQuestionAccessResponse getAccess(User requester) {
+
+        if (requester == null) {
+            return ProgrammingQuestionAccessResponse.builder()
+                    .hasAccess(false)
+                    .enrolledCourseCount(0)
+                    .enrolledKitCount(0)
+                    .message(ACCESS_DENIED_MESSAGE)
+                    .build();
+        }
+
+        if (canViewFullContent(requester)) {
+            return ProgrammingQuestionAccessResponse.builder()
+                    .hasAccess(true)
+                    .enrolledCourseCount(0)
+                    .enrolledKitCount(0)
+                    .message("Admin access granted")
+                    .build();
+        }
+
+        long courseCount = enrollmentRepository
+                .countByUserIdAndStatusNot(requester.getId(), EnrollmentStatus.DROPPED);
+        long kitCount = interviewKitEnrollmentRepository
+                .countByUserIdAndStatusNot(requester.getId(), KitEnrollmentStatus.DROPPED);
+
+        boolean hasAccess = courseCount > 0 || kitCount > 0;
+        return ProgrammingQuestionAccessResponse.builder()
+                .hasAccess(hasAccess)
+                .enrolledCourseCount(courseCount)
+                .enrolledKitCount(kitCount)
+                .message(hasAccess ? null : ACCESS_DENIED_MESSAGE)
+                .build();
+    }
+
+    @Override
+    public CodeExecutionResponse run(
+            UUID questionId, ProgrammingQuestionRunRequest request, User requester) {
 
         ProgrammingQuestion question = findProgrammingQuestion(questionId);
+        ensureAccess(requester, canViewFullContent(requester));
         String language = normalizeLanguage(request.getLanguage());
         validateLanguage(question, language);
 
@@ -169,6 +206,7 @@ public class ProgrammingQuestionServiceImpl implements ProgrammingQuestionServic
             UUID questionId, ProgrammingQuestionSubmitRequest request, User requester) {
 
         ProgrammingQuestion question = findProgrammingQuestion(questionId);
+        ensureAccess(requester, canViewFullContent(requester));
         String language = normalizeLanguage(request.getLanguage());
         validateLanguage(question, language);
 
@@ -273,6 +311,7 @@ public class ProgrammingQuestionServiceImpl implements ProgrammingQuestionServic
         if (requester == null) {
             return List.of();
         }
+        ensureAccess(requester, canViewFullContent(requester));
         findProgrammingQuestion(questionId);
         return programmingQuestionSubmissionRepository
                 .findByQuestionIdAndUserIdOrderBySubmittedAtDesc(questionId, requester.getId())
@@ -408,6 +447,27 @@ public class ProgrammingQuestionServiceImpl implements ProgrammingQuestionServic
     }
 
     /**
+     * Programming questions are a standalone bank: a student unlocks it by
+     * enrolling in at least one course OR at least one interview kit.
+     * Staff bypass the check entirely.
+     */
+    private void ensureAccess(User user, boolean isStaff) {
+        if (isStaff) {
+            return;
+        }
+        if (user == null) {
+            throw new ProgrammingQuestionAccessDeniedException(ACCESS_DENIED_MESSAGE);
+        }
+        boolean enrolledInCourse = enrollmentRepository
+                .countByUserIdAndStatusNot(user.getId(), EnrollmentStatus.DROPPED) > 0;
+        boolean enrolledInKit = interviewKitEnrollmentRepository
+                .countByUserIdAndStatusNot(user.getId(), KitEnrollmentStatus.DROPPED) > 0;
+        if (!enrolledInCourse && !enrolledInKit) {
+            throw new ProgrammingQuestionAccessDeniedException(ACCESS_DENIED_MESSAGE);
+        }
+    }
+
+    /**
      * Hidden test cases must never be exposed to students.
      * Public test cases (input + expected output) stay visible so students
      * can sanity-check their solutions before submitting.
@@ -436,15 +496,13 @@ public class ProgrammingQuestionServiceImpl implements ProgrammingQuestionServic
      * Only students get a persisted-storage-backed status. Staff requests
      * (and anonymous/none) simply get an empty map.
      */
-    private Map<UUID, ProgrammingQuestionSubmission> resolveLatestSubmissions(
-            UUID courseId, User requester) {
+    private Map<UUID, ProgrammingQuestionSubmission> resolveLatestSubmissions(User requester) {
 
         if (requester == null || canViewFullContent(requester)) {
             return Map.of();
         }
         return programmingQuestionSubmissionRepository
-                .findByUserIdAndQuestion_CourseIdOrderBySubmittedAtDesc(
-                        requester.getId(), courseId)
+                .findByUserIdOrderBySubmittedAtDesc(requester.getId())
                 .stream()
                 .collect(Collectors.toMap(
                         submission -> submission.getQuestion().getId(),

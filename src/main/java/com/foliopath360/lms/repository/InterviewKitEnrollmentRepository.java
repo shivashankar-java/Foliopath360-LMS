@@ -25,6 +25,8 @@ public interface InterviewKitEnrollmentRepository extends JpaRepository<Intervie
 
     long countByKitIdAndStatusNot(UUID kitId, KitEnrollmentStatus status);
 
+    long countByUserIdAndStatusNot(UUID userId, KitEnrollmentStatus status);
+
     long countByStatusNot(KitEnrollmentStatus status);
 
     long countByStatusNotAndEnrolledAtAfter(KitEnrollmentStatus status, LocalDateTime enrolledAtAfter);

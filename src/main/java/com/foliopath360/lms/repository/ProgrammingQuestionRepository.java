@@ -10,11 +10,9 @@ import java.util.UUID;
 @Repository
 public interface ProgrammingQuestionRepository extends JpaRepository<ProgrammingQuestion, UUID> {
 
-    List<ProgrammingQuestion> findByCourseIdOrderByDisplayOrderAsc(UUID courseId);
+    List<ProgrammingQuestion> findAllByOrderByDisplayOrderAsc();
+
+    List<ProgrammingQuestion> findByDifficultyOrderByDisplayOrderAsc(String difficulty);
 
     boolean existsByQuestionCode(String questionCode);
-
-    boolean existsByCourseIdAndDisplayOrder(UUID courseId, Integer displayOrder);
-
-    void deleteByCourseId(UUID courseId);
 }

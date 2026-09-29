@@ -75,6 +75,13 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(ProgrammingQuestionAccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleProgrammingQuestionAccessDenied(
+            ProgrammingQuestionAccessDeniedException ex
+    ) {
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Map<String, Object>> handleBadCredentials(
             BadCredentialsException ex

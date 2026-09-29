@@ -13,7 +13,6 @@ import java.util.UUID;
 public class ProgrammingQuestionResponse {
 
     private UUID id;
-    private UUID courseId;
     private String questionCode;
     private String title;
     private String problemStatement;

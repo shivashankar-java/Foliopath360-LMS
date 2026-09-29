@@ -24,10 +24,6 @@ public class ProgrammingQuestion extends AuditFields {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "course_id", nullable = false)
-    private Course course;
-
     @Column(name = "question_code", nullable = false, unique = true, length = 50)
     private String questionCode;
 

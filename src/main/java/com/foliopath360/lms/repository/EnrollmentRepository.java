@@ -26,6 +26,8 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
 
     long countByUserId(UUID userId);
 
+    long countByUserIdAndStatusNot(UUID userId, EnrollmentStatus status);
+
     long countByCourseIdAndStatusNot(UUID courseId, EnrollmentStatus status);
 
     long countByStatus(com.foliopath360.lms.entity.EnrollmentStatus status);

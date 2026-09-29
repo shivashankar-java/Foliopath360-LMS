@@ -221,6 +221,30 @@ public class SecurityConfig {
                                 "/api/modules/*/mock-tests/**"
                         ).hasAnyRole("SUPER_ADMIN", "STAFF")
 
+                        // Standalone programming question bank.
+                        // Code execution is open to enrolled students and staff,
+                        // so it must be declared before the authoring rule below.
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.POST,
+                                "/api/programming-questions/*/run",
+                                "/api/programming-questions/*/submit"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF", "STUDENT")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.POST,
+                                "/api/programming-questions/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.PUT,
+                                "/api/programming-questions/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.DELETE,
+                                "/api/programming-questions/**"
+                        ).hasAnyRole("SUPER_ADMIN", "STAFF")
+
                         .anyRequest().authenticated()
                 )
 

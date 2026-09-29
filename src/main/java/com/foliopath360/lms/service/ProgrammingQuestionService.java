@@ -4,6 +4,7 @@ import com.foliopath360.lms.dto.request.ProgrammingQuestionRequest;
 import com.foliopath360.lms.dto.request.ProgrammingQuestionRunRequest;
 import com.foliopath360.lms.dto.request.ProgrammingQuestionSubmitRequest;
 import com.foliopath360.lms.dto.response.CodeExecutionResponse;
+import com.foliopath360.lms.dto.response.ProgrammingQuestionAccessResponse;
 import com.foliopath360.lms.dto.response.ProgrammingQuestionResponse;
 import com.foliopath360.lms.dto.response.ProgrammingQuestionSubmissionResponse;
 import com.foliopath360.lms.dto.response.ProgrammingQuestionSubmitResponse;
@@ -14,7 +15,7 @@ import java.util.UUID;
 
 public interface ProgrammingQuestionService {
 
-    ProgrammingQuestionResponse createProgrammingQuestion(UUID courseId, ProgrammingQuestionRequest request);
+    ProgrammingQuestionResponse createProgrammingQuestion(ProgrammingQuestionRequest request);
 
     ProgrammingQuestionResponse updateProgrammingQuestion(UUID questionId, ProgrammingQuestionRequest request);
 
@@ -22,9 +23,16 @@ public interface ProgrammingQuestionService {
 
     ProgrammingQuestionResponse getProgrammingQuestion(UUID questionId, User requester);
 
-    List<ProgrammingQuestionResponse> getProgrammingQuestionsByCourse(UUID courseId, User requester);
+    /**
+     * All programming questions. Hidden test cases are stripped and per-student
+     * solved status is attached for students; staff see the raw bank.
+     */
+    List<ProgrammingQuestionResponse> getProgrammingQuestions(User requester);
 
-    CodeExecutionResponse run(UUID questionId, ProgrammingQuestionRunRequest request);
+    ProgrammingQuestionAccessResponse getAccess(User requester);
+
+    CodeExecutionResponse run(
+            UUID questionId, ProgrammingQuestionRunRequest request, User requester);
 
     ProgrammingQuestionSubmitResponse submit(
             UUID questionId, ProgrammingQuestionSubmitRequest request, User requester);

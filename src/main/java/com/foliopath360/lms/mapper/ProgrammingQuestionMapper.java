@@ -18,7 +18,6 @@ public interface ProgrammingQuestionMapper {
     // question back-reference is never left null. allowedLanguages
     // is stored as a comma-joined string and set manually.
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "course", ignore = true)
     @Mapping(target = "questionCode", ignore = true)
     @Mapping(target = "allowedLanguages", ignore = true)
     @Mapping(target = "testCases", ignore = true)
@@ -28,7 +27,6 @@ public interface ProgrammingQuestionMapper {
     @Mapping(target = "question", ignore = true)
     ProgrammingTestCase toTestCaseEntity(ProgrammingTestCaseRequest request);
 
-    @Mapping(target = "courseId", source = "course.id")
     @Mapping(target = "allowedLanguages", ignore = true)
     ProgrammingQuestionResponse toResponse(ProgrammingQuestion question);
 

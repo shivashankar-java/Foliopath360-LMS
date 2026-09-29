@@ -4,6 +4,7 @@ import com.foliopath360.lms.dto.request.ProgrammingQuestionRequest;
 import com.foliopath360.lms.dto.request.ProgrammingQuestionRunRequest;
 import com.foliopath360.lms.dto.request.ProgrammingQuestionSubmitRequest;
 import com.foliopath360.lms.dto.response.CodeExecutionResponse;
+import com.foliopath360.lms.dto.response.ProgrammingQuestionAccessResponse;
 import com.foliopath360.lms.dto.response.ProgrammingQuestionResponse;
 import com.foliopath360.lms.dto.response.ProgrammingQuestionSubmissionResponse;
 import com.foliopath360.lms.dto.response.ProgrammingQuestionSubmitResponse;
@@ -20,6 +21,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Standalone programming question bank — not attached to any course.
+ * Staff read/write everything. Students read and attempt, but only once they
+ * are enrolled in at least one course or interview kit (enforced in the
+ * service layer and reported by {@code /student/access}).
+ */
 @RestController
 @RequestMapping("/api/programming-questions")
 @RequiredArgsConstructor
@@ -27,18 +34,24 @@ public class ProgrammingQuestionController {
 
     private final ProgrammingQuestionService programmingQuestionService;
 
-    /**
-     * Public listing of a course's programming questions.
-     * Hidden test cases are included only for SUPER_ADMIN / STAFF requests.
-     */
-    @GetMapping("/course/{courseId}")
-    public ResponseEntity<List<ProgrammingQuestionResponse>> getProgrammingQuestionsByCourse(
-            @PathVariable UUID courseId,
+    @GetMapping
+    public ResponseEntity<List<ProgrammingQuestionResponse>> getProgrammingQuestions(
             @AuthenticationPrincipal User requester
     ) {
         return ResponseEntity.ok(
-                programmingQuestionService.getProgrammingQuestionsByCourse(courseId, requester)
+                programmingQuestionService.getProgrammingQuestions(requester)
         );
+    }
+
+    /**
+     * Whether the caller may open the programming question bank. Used by the
+     * student sidebar to decide between a normal nav item and a locked one.
+     */
+    @GetMapping("/student/access")
+    public ResponseEntity<ProgrammingQuestionAccessResponse> getAccess(
+            @AuthenticationPrincipal User requester
+    ) {
+        return ResponseEntity.ok(programmingQuestionService.getAccess(requester));
     }
 
     @GetMapping("/{questionId}")
@@ -54,10 +67,11 @@ public class ProgrammingQuestionController {
     @PostMapping("/{questionId}/run")
     public ResponseEntity<CodeExecutionResponse> run(
             @PathVariable UUID questionId,
-            @Valid @RequestBody ProgrammingQuestionRunRequest request
+            @Valid @RequestBody ProgrammingQuestionRunRequest request,
+            @AuthenticationPrincipal User requester
     ) {
         return ResponseEntity.ok(
-                programmingQuestionService.run(questionId, request)
+                programmingQuestionService.run(questionId, request, requester)
         );
     }
 
@@ -87,6 +101,16 @@ public class ProgrammingQuestionController {
         );
     }
 
+    @PostMapping
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'STAFF')")
+    public ResponseEntity<ProgrammingQuestionResponse> createProgrammingQuestion(
+            @Valid @RequestBody ProgrammingQuestionRequest request
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(programmingQuestionService.createProgrammingQuestion(request));
+    }
+
     @PutMapping("/{questionId}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'STAFF')")
     public ResponseEntity<ProgrammingQuestionResponse> updateProgrammingQuestion(
@@ -105,16 +129,5 @@ public class ProgrammingQuestionController {
     ) {
         programmingQuestionService.deleteProgrammingQuestion(questionId);
         return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/course/{courseId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'STAFF')")
-    public ResponseEntity<ProgrammingQuestionResponse> createProgrammingQuestion(
-            @PathVariable UUID courseId,
-            @Valid @RequestBody ProgrammingQuestionRequest request
-    ) {
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(programmingQuestionService.createProgrammingQuestion(courseId, request));
     }
 }

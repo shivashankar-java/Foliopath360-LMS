@@ -15,5 +15,5 @@ public interface ProgrammingQuestionSubmissionRepository
             findByQuestionIdAndUserIdOrderBySubmittedAtDesc(UUID questionId, UUID userId);
 
     List<ProgrammingQuestionSubmission>
-            findByUserIdAndQuestion_CourseIdOrderBySubmittedAtDesc(UUID userId, UUID courseId);
+            findByUserIdOrderBySubmittedAtDesc(UUID userId);
 }
