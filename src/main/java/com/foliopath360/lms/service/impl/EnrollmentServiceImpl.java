@@ -14,6 +14,7 @@ import com.foliopath360.lms.repository.OrderRepository;
 import com.foliopath360.lms.repository.PaymentRepository;
 import com.foliopath360.lms.repository.UserRepository;
 import com.foliopath360.lms.service.EnrollmentService;
+import com.foliopath360.lms.service.ModuleProgressService;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +36,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final EnrollmentMapper enrollmentMapper;
+    private final ModuleProgressService moduleProgressService;
 
     public EnrollmentServiceImpl(
             EnrollmentRepository enrollmentRepository,
@@ -44,7 +46,8 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             UserRepository userRepository,
             OrderRepository orderRepository,
             PaymentRepository paymentRepository,
-            EnrollmentMapper enrollmentMapper
+            EnrollmentMapper enrollmentMapper,
+            ModuleProgressService moduleProgressService
     ) {
         this.enrollmentRepository = enrollmentRepository;
         this.lessonProgressRepository = lessonProgressRepository;
@@ -54,6 +57,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         this.orderRepository = orderRepository;
         this.paymentRepository = paymentRepository;
         this.enrollmentMapper = enrollmentMapper;
+        this.moduleProgressService = moduleProgressService;
     }
 
     @Override
@@ -109,8 +113,16 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             enrollment.setStatus(EnrollmentStatus.ENROLLED);
             enrollment.setCompletedAt(null);
 
+            enrollment = enrollmentRepository.save(enrollment);
+
+            // Re-derive progress: the student keeps every module they already
+            // passed, so the sequence resumes at their current module.
+            moduleProgressService.refreshEnrollmentProgress(
+                    student.getId(), course.getId());
+
             return enrollmentMapper.toResponse(
-                    enrollmentRepository.save(enrollment)
+                    enrollmentRepository.findByUserIdAndCourseId(
+                            student.getId(), course.getId()).orElse(enrollment)
             );
         }
 
@@ -483,37 +495,20 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         return enrollment;
     }
 
+    /**
+     * Course progress is derived from <em>passed mock tests</em> only, never
+     * from lessons being opened or viewed, so reading a module can never move
+     * the percentage. The lesson counters below are informational.
+     */
     private void recomputeProgress(Enrollment enrollment) {
 
-        UUID userId = enrollment.getUser().getId();
-        UUID courseId = enrollment.getCourse().getId();
-
-        long total = lessonRepository.countByCourseId(courseId);
-        long done = lessonProgressRepository
-                .countByUserIdAndLessonModuleCourseId(userId, courseId);
-
-        int percentage = total == 0 ? 0 : (int) ((done * 100) / total);
-
-        enrollment.setProgressPercentage(percentage);
-
-        if (enrollment.getStatus() != EnrollmentStatus.DROPPED) {
-
-            if (percentage >= 100) {
-                enrollment.setStatus(EnrollmentStatus.COMPLETED);
-                if (enrollment.getCompletedAt() == null) {
-                    enrollment.setCompletedAt(LocalDateTime.now());
-                }
-            } else {
-                if (done > 0) {
-                    enrollment.setStatus(EnrollmentStatus.IN_PROGRESS);
-                } else {
-                    enrollment.setStatus(EnrollmentStatus.ENROLLED);
-                }
-                enrollment.setCompletedAt(null);
-            }
+        if (enrollment.getStatus() == EnrollmentStatus.DROPPED) {
+            return;
         }
 
-        enrollmentRepository.save(enrollment);
+        moduleProgressService.refreshEnrollmentProgress(
+                enrollment.getUser().getId(),
+                enrollment.getCourse().getId());
     }
 
     private CourseProgressResponse buildProgressResponse(

@@ -13,6 +13,7 @@ import com.foliopath360.lms.repository.CourseModuleRepository;
 import com.foliopath360.lms.repository.EnrollmentRepository;
 import com.foliopath360.lms.repository.LessonRepository;
 import com.foliopath360.lms.service.LessonService;
+import com.foliopath360.lms.service.ModuleProgressService;
 import com.foliopath360.lms.util.ContentSanitizer;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -30,19 +31,22 @@ public class LessonServiceImpl implements LessonService {
     private final EnrollmentRepository enrollmentRepository;
     private final CourseCourseModuleRepository courseCourseModuleRepository;
     private final CourseMapper courseMapper;
+    private final ModuleProgressService moduleProgressService;
 
     public LessonServiceImpl(
             LessonRepository lessonRepository,
             CourseModuleRepository courseModuleRepository,
             EnrollmentRepository enrollmentRepository,
             CourseCourseModuleRepository courseCourseModuleRepository,
-            CourseMapper courseMapper
+            CourseMapper courseMapper,
+            ModuleProgressService moduleProgressService
     ) {
         this.lessonRepository = lessonRepository;
         this.courseModuleRepository = courseModuleRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.courseCourseModuleRepository = courseCourseModuleRepository;
         this.courseMapper = courseMapper;
+        this.moduleProgressService = moduleProgressService;
     }
 
     @Override
@@ -225,9 +229,11 @@ public class LessonServiceImpl implements LessonService {
 
         UUID courseId = lesson.getModule().getCourse().getId();
 
-        // 1) Direct enrollment in the lesson's own course.
-        if (enrollmentRepository.existsByUserIdAndCourseIdAndStatusNot(
-                user.getId(), courseId, EnrollmentStatus.DROPPED)) {
+        // 1) Direct enrollment in the lesson's own course. Modules unlock
+        //    sequentially: a module is readable only once the previous
+        //    module's mock test has been passed, so the lock cannot be
+        //    bypassed by requesting a lesson id directly.
+        if (moduleProgressService.isModuleUnlocked(user, lesson.getModule())) {
             return true;
         }
 

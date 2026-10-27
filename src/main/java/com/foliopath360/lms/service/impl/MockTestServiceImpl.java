@@ -16,6 +16,7 @@ import com.foliopath360.lms.repository.MockTestAttemptRepository;
 import com.foliopath360.lms.repository.MockTestQuestionRepository;
 import com.foliopath360.lms.repository.MockTestRepository;
 import com.foliopath360.lms.service.MockTestService;
+import com.foliopath360.lms.service.ModuleProgressService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,6 +43,7 @@ public class MockTestServiceImpl implements MockTestService {
     private final MockTestQuestionRepository mockTestQuestionRepository;
     private final MockTestAttemptRepository mockTestAttemptRepository;
     private final CourseModuleRepository courseModuleRepository;
+    private final ModuleProgressService moduleProgressService;
     private final MockTestMapper mockTestMapper;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -94,10 +96,17 @@ public class MockTestServiceImpl implements MockTestService {
     }
 
     @Override
-    @Transactional
     public MockTestResponse getMockTestById(UUID mockTestId, User requester) {
 
         MockTest mockTest = findMockTest(mockTestId);
+
+        // Sequential gate: a student cannot open a mock test belonging to a
+        // module they have not unlocked yet, so skipping ahead requires no
+        // more than crafting a URL with a known test id.
+        if (requester != null && hasRole(requester, "STUDENT")) {
+            moduleProgressService.requireModuleAccess(
+                    requester, mockTest.getModule());
+        }
 
         MockTestResponse response = mockTestMapper.toResponse(mockTest);
 
@@ -110,6 +119,18 @@ public class MockTestServiceImpl implements MockTestService {
     @Override
     @Transactional
     public List<MockTestResponse> getMockTestsByModule(UUID moduleId, User requester) {
+
+        CourseModule module = courseModuleRepository.findById(moduleId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("CourseModule", "id", moduleId));
+
+        // A locked module has no tests to list. Returning an empty list keeps
+        // the public course preview intact while withholding the tests of a
+        // module the student has not reached.
+        if (requester != null && hasRole(requester, "STUDENT")
+                && !moduleProgressService.canAccessModule(requester, module)) {
+            return List.of();
+        }
 
         boolean includeAnswers = canViewAnswers(requester);
 
@@ -133,6 +154,11 @@ public class MockTestServiceImpl implements MockTestService {
             User student, UUID mockTestId, MockTestAttemptRequest request) {
 
         MockTest mockTest = findMockTest(mockTestId);
+
+        // Server-side sequential gate. A student must be enrolled and must
+        // have unlocked this module (i.e. passed the previous module's mock
+        // test) before an attempt is accepted.
+        moduleProgressService.requireModuleAccess(student, mockTest.getModule());
 
         // Each student can attempt a mock test only once
         if (mockTestAttemptRepository.existsByUserIdAndMockTestId(
@@ -176,6 +202,12 @@ public class MockTestServiceImpl implements MockTestService {
                 .build();
 
         MockTestAttempt saved = mockTestAttemptRepository.save(attempt);
+
+        // Grading IS the module-completion signal: a passed attempt marks
+        // this module COMPLETED and unlocks the next one. A failed attempt
+        // changes nothing, so the student may retry nothing - the single
+        // attempt rule above applies - but progress does not advance.
+        moduleProgressService.onMockTestAttempt(student, mockTest.getModule());
 
         return toAttemptResponse(saved, mockTest);
     }
@@ -299,12 +331,17 @@ public class MockTestServiceImpl implements MockTestService {
 
     private boolean canViewAnswers(User user) {
 
+        return hasRole(user, "SUPER_ADMIN") || hasRole(user, "STAFF");
+    }
+
+    private boolean hasRole(User user, String roleName) {
+
         if (user == null || user.getRoles() == null) {
             return false;
         }
         return user.getRoles().stream()
                 .map(Role::getRoleName)
-                .anyMatch(name -> name.equals("SUPER_ADMIN") || name.equals("STAFF"));
+                .anyMatch(roleName::equals);
     }
 
     /**
