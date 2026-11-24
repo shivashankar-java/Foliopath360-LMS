@@ -4,6 +4,7 @@ import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -89,7 +90,17 @@ public class EmailService {
         send(to, subject, html);
     }
 
+    public void sendInvoiceEmail(String to, String subject, String htmlBody,
+                                  byte[] pdfAttachment, String attachmentFilename) {
+        send(to, subject, htmlBody, pdfAttachment, attachmentFilename);
+    }
+
     private void send(String to, String subject, String htmlBody) {
+        send(to, subject, htmlBody, null, null);
+    }
+
+    private void send(String to, String subject, String htmlBody,
+                      byte[] pdfAttachment, String attachmentFilename) {
 
         if (!mailEnabled) {
             log.info("[MAIL DISABLED] Would send email to={} subject={}", to, subject);
@@ -106,6 +117,16 @@ public class EmailService {
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
+
+            if (pdfAttachment != null && pdfAttachment.length > 0) {
+                ByteArrayResource resource = new ByteArrayResource(pdfAttachment) {
+                    @Override
+                    public String getFilename() {
+                        return attachmentFilename;
+                    }
+                };
+                helper.addAttachment(attachmentFilename, resource);
+            }
 
             mailSender.send(message);
 

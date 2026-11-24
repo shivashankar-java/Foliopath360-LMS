@@ -1,5 +1,6 @@
 package com.foliopath360.lms.exception;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -36,6 +37,22 @@ public class GlobalExceptionHandler {
             RazorpayApiException ex
     ) {
         return buildResponse(HttpStatus.BAD_GATEWAY, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvoiceGenerationException.class)
+    public ResponseEntity<Map<String, Object>> handleInvoiceGeneration(
+            InvoiceGenerationException ex
+    ) {
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(
+            DataIntegrityViolationException ex
+    ) {
+        return buildResponse(HttpStatus.CONFLICT,
+                "The request conflicts with existing data. If you retried a payment "
+                        + "or invoice operation, please refresh and try again.");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

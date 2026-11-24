@@ -60,6 +60,10 @@ public class Payment extends AuditFields {
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
 
+    // Gateway transaction id for online payments; bank/UPI reference for offline payments.
+    @Column(name = "payment_reference", length = 120)
+    private String paymentReference;
+
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 }

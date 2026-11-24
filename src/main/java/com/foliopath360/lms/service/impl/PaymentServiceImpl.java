@@ -18,6 +18,7 @@ import com.foliopath360.lms.repository.OrderRepository;
 import com.foliopath360.lms.repository.PaymentRepository;
 import com.foliopath360.lms.service.EnrollmentService;
 import com.foliopath360.lms.service.InterviewKitService;
+import com.foliopath360.lms.service.InvoiceService;
 import com.foliopath360.lms.service.PaymentService;
 import com.foliopath360.lms.util.RazorpaySignatureUtil;
 import jakarta.transaction.Transactional;
@@ -47,6 +48,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final InterviewKitService interviewKitService;
     private final RazorpayGateway razorpayGateway;
     private final RazorpayProperties razorpayProperties;
+    private final InvoiceService invoiceService;
 
     public PaymentServiceImpl(
             PaymentRepository paymentRepository,
@@ -54,7 +56,8 @@ public class PaymentServiceImpl implements PaymentService {
             EnrollmentService enrollmentService,
             InterviewKitService interviewKitService,
             RazorpayGateway razorpayGateway,
-            RazorpayProperties razorpayProperties
+            RazorpayProperties razorpayProperties,
+            InvoiceService invoiceService
     ) {
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
@@ -62,6 +65,7 @@ public class PaymentServiceImpl implements PaymentService {
         this.interviewKitService = interviewKitService;
         this.razorpayGateway = razorpayGateway;
         this.razorpayProperties = razorpayProperties;
+        this.invoiceService = invoiceService;
     }
 
     // ------------------------------------------------------------------
@@ -327,6 +331,8 @@ public class PaymentServiceImpl implements PaymentService {
                 order.getOrderNumber(), enrolledCourseIds.size(), enrolledKitIds.size(),
                 order.getUser().getId());
 
+        generateInvoiceSafely(payment);
+
         return PaymentResultResponse.builder()
                 .message("Payment successful. Your purchases are now unlocked.")
                 .paymentStatus(PaymentStatus.SUCCESS.name())
@@ -339,6 +345,8 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private PaymentResultResponse buildAlreadyPaidResult(Payment payment, Order order) {
+
+        generateInvoiceSafely(payment);
 
         List<UUID> enrolledCourseIds = new ArrayList<>();
         List<UUID> enrolledKitIds = new ArrayList<>();
@@ -360,6 +368,20 @@ public class PaymentServiceImpl implements PaymentService {
                 .enrolledCourseIds(enrolledCourseIds)
                 .enrolledKitIds(enrolledKitIds)
                 .build();
+    }
+
+    /**
+     * Invoice creation must never roll back a verified payment. If it fails,
+     * the next verify/webhook call retries through the idempotent invoice
+     * service (one successful payment => at most one invoice).
+     */
+    private void generateInvoiceSafely(Payment payment) {
+        try {
+            invoiceService.ensureInvoiceForPayment(payment);
+        } catch (RuntimeException ex) {
+            log.error("Invoice generation failed for payment {}; it will be retried",
+                    payment.getId(), ex);
+        }
     }
 
     /**

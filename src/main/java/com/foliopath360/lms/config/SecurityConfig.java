@@ -98,6 +98,11 @@ public class SecurityConfig {
                                 "/api/payments/webhook"
                         ).permitAll()
 
+                        // Invoice APIs: method-level rules further restrict
+                        // admin-only listing and student-owned invoice access.
+                        .requestMatchers("/api/invoices/**")
+                        .hasAnyRole("STUDENT", "STAFF", "SUPER_ADMIN")
+
                         // Student APIs
                         .requestMatchers("/api/student/**")
                         .hasRole("STUDENT")
