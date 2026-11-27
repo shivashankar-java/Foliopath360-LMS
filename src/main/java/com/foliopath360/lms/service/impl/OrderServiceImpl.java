@@ -116,6 +116,13 @@ public class OrderServiceImpl implements OrderService {
 
         BigDecimal discountAmount = BigDecimal.ZERO; // coupons come later
 
+        List<Order> staleOrders = orderRepository.findAllByUserIdAndStatusIn(
+                student.getId(),
+                List.of(OrderStatus.CREATED, OrderStatus.PAYMENT_PENDING)
+        );
+        staleOrders.forEach(order -> order.setStatus(OrderStatus.CANCELLED));
+        orderRepository.saveAll(staleOrders);
+
         Order order = Order.builder()
                 .orderNumber(generateOrderNumber())
                 .user(student)

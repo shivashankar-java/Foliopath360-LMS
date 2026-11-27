@@ -31,6 +31,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -130,6 +131,33 @@ class PaymentServiceImplInvoiceTest {
 
         verify(invoiceService, times(2)).ensureInvoiceForPayment(payment);
         verify(enrollmentService, times(1)).enrollAfterPayment(any(), any());
+    }
+
+    @Test
+    void invoiceGenerationFailureDoesNotFailPaymentVerification() {
+        when(paymentRepository.findByRazorpayOrderId("order_TEST1"))
+                .thenReturn(Optional.of(payment));
+        doThrow(new RuntimeException("invoice unavailable"))
+                .when(invoiceService).ensureInvoiceForPayment(payment);
+
+        var result = service.verifyPayment(student, request);
+
+        assertThat(result.getPaymentStatus()).isEqualTo("SUCCESS");
+        verify(invoiceService).ensureInvoiceForPayment(payment);
+    }
+
+    @Test
+    void cancelledOrderDoesNotEnrollOrGenerateInvoice() {
+        payment.getOrder().setStatus(OrderStatus.CANCELLED);
+        when(paymentRepository.findByRazorpayOrderId("order_TEST1"))
+                .thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> service.verifyPayment(student, request))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        verify(enrollmentService, never()).enrollAfterPayment(any(), any());
+        verify(invoiceService, never()).ensureInvoiceForPayment(any());
     }
 
     @Test

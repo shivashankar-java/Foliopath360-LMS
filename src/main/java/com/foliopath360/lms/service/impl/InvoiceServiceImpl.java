@@ -44,6 +44,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -115,9 +116,13 @@ public class InvoiceServiceImpl implements InvoiceService {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.MANDATORY)
     public InvoiceResponse ensureInvoiceForPayment(Payment payment) {
-        return generateInvoice(payment, BigDecimal.ZERO, BigDecimal.ZERO, null, null);
+        if (payment == null || payment.getId() == null) {
+            throw new InvoiceGenerationException("Payment record is required");
+        }
+        Payment managed = paymentRepository.findById(payment.getId()).orElse(payment);
+        return generateInvoice(managed, BigDecimal.ZERO, BigDecimal.ZERO, null, null);
     }
 
     @Override

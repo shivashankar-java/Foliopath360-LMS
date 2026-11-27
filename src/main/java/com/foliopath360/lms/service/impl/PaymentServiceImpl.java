@@ -86,12 +86,21 @@ public class PaymentServiceImpl implements PaymentService {
                 .findFirstByOrderIdOrderByCreatedDtDesc(order.getId())
                 .orElse(null);
 
-        // Reuse the existing Razorpay order on retry (page refresh, network
-        // failure, etc.) so we don't create a new gateway order every time.
-        boolean reusable = payment != null
+        boolean forceNew = request != null && request.isForceNew();
+        boolean reusable = !forceNew
+                && payment != null
                 && payment.getRazorpayOrderId() != null
                 && (payment.getStatus() == PaymentStatus.CREATED
                     || payment.getStatus() == PaymentStatus.PENDING);
+
+        if (forceNew && payment != null) {
+            if (payment.getStatus() == PaymentStatus.CREATED) {
+                payment.setStatus(PaymentStatus.FAILED);
+                payment.setFailureReason("Superseded by a new payment request");
+                paymentRepository.save(payment);
+            }
+            payment = null;
+        }
 
         if (!reusable) {
 
@@ -127,7 +136,9 @@ public class PaymentServiceImpl implements PaymentService {
                 .amountInPaise(toPaise(order.getFinalAmount()))
                 .amount(order.getFinalAmount())
                 .currency(order.getCurrency())
-                .razorpayKeyId(razorpayProperties.getKeyId())
+                .razorpayKeyId(razorpayProperties.getKeyId() == null
+                        ? null
+                        : razorpayProperties.getKeyId().trim())
                 .build();
     }
 
@@ -158,6 +169,14 @@ public class PaymentServiceImpl implements PaymentService {
             return buildAlreadyPaidResult(payment, order);
         }
 
+        if (order.getStatus() == OrderStatus.CANCELLED
+                || order.getStatus() == OrderStatus.PAID) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureReason("Order was no longer payable");
+            paymentRepository.save(payment);
+            throw new IllegalStateException("This order can no longer be paid");
+        }
+
         boolean valid = RazorpaySignatureUtil.isValidSignature(
                 razorpayProperties.getKeySecret(),
                 request.getRazorpayOrderId() + "|"
@@ -177,6 +196,58 @@ public class PaymentServiceImpl implements PaymentService {
                 payment, order,
                 request.getRazorpayPaymentId(),
                 request.getRazorpaySignature());
+    }
+
+    @Override
+    public PaymentResultResponse getPaymentStatus(User student, UUID orderId) {
+
+        Order order = orderRepository.findByIdAndUserId(orderId, student.getId())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Order", "id", orderId));
+
+        Payment payment = paymentRepository
+                .findFirstByOrderIdOrderByCreatedDtDesc(order.getId())
+                .orElse(null);
+
+        PaymentStatus paymentStatus = payment == null
+                ? PaymentStatus.PENDING
+                : payment.getStatus();
+
+        String message;
+        if (paymentStatus == PaymentStatus.SUCCESS && order.getStatus() == OrderStatus.PAID) {
+            message = "Payment successful. Your purchases are now unlocked.";
+        } else if (paymentStatus == PaymentStatus.FAILED) {
+            message = payment.getFailureReason() == null
+                    ? "Payment could not be completed."
+                    : payment.getFailureReason();
+        } else {
+            message = "Payment is still being processed.";
+        }
+
+        List<UUID> enrolledCourseIds = new ArrayList<>();
+        List<UUID> enrolledKitIds = new ArrayList<>();
+        if (paymentStatus == PaymentStatus.SUCCESS && order.getStatus() == OrderStatus.PAID) {
+            for (OrderItem item : order.getItems()) {
+                if (item.getCourse() != null) {
+                    enrolledCourseIds.add(item.getCourse().getId());
+                } else if (item.getKit() != null) {
+                    enrolledKitIds.add(item.getKit().getId());
+                }
+            }
+        }
+
+        return PaymentResultResponse.builder()
+                .message(message)
+                .paymentStatus(paymentStatus.name())
+                .razorpayPaymentId(payment == null ? null : payment.getRazorpayPaymentId())
+                .amount(payment == null ? order.getFinalAmount() : payment.getAmount())
+                .paymentMethod(payment == null ? "Razorpay" : payment.getPaymentMethod())
+                .orderId(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .orderStatus(order.getStatus().name())
+                .enrolledCourseIds(enrolledCourseIds)
+                .enrolledKitIds(enrolledKitIds)
+                .build();
     }
 
     // ------------------------------------------------------------------
@@ -279,9 +350,13 @@ public class PaymentServiceImpl implements PaymentService {
     private Order resolvePayableOrder(User student, UUID orderId) {
 
         if (orderId != null) {
-            return orderRepository.findByIdAndUserId(orderId, student.getId())
+            Order order = orderRepository.findByIdAndUserId(orderId, student.getId())
                     .orElseThrow(() ->
                             new ResourceNotFoundException("Order", "id", orderId));
+            if (order.getStatus() == OrderStatus.CANCELLED) {
+                throw new IllegalStateException("This order can no longer be paid");
+            }
+            return order;
         }
 
         return orderRepository.findFirstByUserIdAndStatusInOrderByCreatedDtDesc(
@@ -336,6 +411,9 @@ public class PaymentServiceImpl implements PaymentService {
         return PaymentResultResponse.builder()
                 .message("Payment successful. Your purchases are now unlocked.")
                 .paymentStatus(PaymentStatus.SUCCESS.name())
+                .razorpayPaymentId(payment.getRazorpayPaymentId())
+                .amount(payment.getAmount())
+                .paymentMethod(payment.getPaymentMethod())
                 .orderId(order.getId())
                 .orderNumber(order.getOrderNumber())
                 .orderStatus(order.getStatus().name())
@@ -362,6 +440,9 @@ public class PaymentServiceImpl implements PaymentService {
         return PaymentResultResponse.builder()
                 .message("This order was already paid.")
                 .paymentStatus(PaymentStatus.SUCCESS.name())
+                .razorpayPaymentId(payment.getRazorpayPaymentId())
+                .amount(payment.getAmount())
+                .paymentMethod(payment.getPaymentMethod())
                 .orderId(order.getId())
                 .orderNumber(order.getOrderNumber())
                 .orderStatus(order.getStatus().name())

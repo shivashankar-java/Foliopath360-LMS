@@ -31,7 +31,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -233,6 +236,16 @@ class InvoiceServiceImplTest {
         verify(enrollmentService).enrollAfterPayment(student, course);
         verify(orderRepository).save(order);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
+    void ensureInvoiceForPaymentRequiresExistingTransaction() throws Exception {
+        Method method = InvoiceServiceImpl.class.getMethod(
+                "ensureInvoiceForPayment", Payment.class);
+        Transactional transactional = method.getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.propagation()).isEqualTo(Propagation.MANDATORY);
     }
 
     private void stubSuccessfulGeneration() {

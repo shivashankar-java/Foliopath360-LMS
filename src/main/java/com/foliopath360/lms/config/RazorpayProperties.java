@@ -25,6 +25,18 @@ public class RazorpayProperties {
 
     private String currency = "INR";
 
+    public void setKeyId(String keyId) {
+        this.keyId = keyId == null ? null : keyId.trim();
+    }
+
+    public void setKeySecret(String keySecret) {
+        this.keySecret = keySecret == null ? null : keySecret.trim();
+    }
+
+    public void setWebhookSecret(String webhookSecret) {
+        this.webhookSecret = webhookSecret == null ? null : webhookSecret.trim();
+    }
+
     public boolean isConfigured() {
         return keyId != null && !keyId.isBlank()
                 && keySecret != null && !keySecret.isBlank();

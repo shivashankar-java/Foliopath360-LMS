@@ -14,6 +14,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
@@ -53,6 +55,15 @@ public class PaymentController {
             @Valid @RequestBody VerifyPaymentRequest request
     ) {
         return ResponseEntity.ok(paymentService.verifyPayment(student, request));
+    }
+
+    @GetMapping("/status/{orderId}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<PaymentResultResponse> getPaymentStatus(
+            @AuthenticationPrincipal User student,
+            @PathVariable UUID orderId
+    ) {
+        return ResponseEntity.ok(paymentService.getPaymentStatus(student, orderId));
     }
 
     /**
